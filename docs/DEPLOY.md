@@ -24,12 +24,12 @@ Estado por etapa: ✅ listo para hacer · 🕒 se completa en una etapa posterio
 
    > ⚠️ Nunca cargar `DEMO_MODE` en Production: el build falla a propósito si `DEMO_MODE=true` y `VERCEL_ENV=production`.
 
-### 1.2 Rama de producción (ADR-010)
+### 1.2 Rama `demo` (ADR-011)
 
-Hasta que esté el login real (etapa 2), producción no tiene cómo funcionar. Para que cada push a `main` genere un **Preview** en modo demo:
+`main` es la rama de producción de Vercel y, hasta que esté el login real (etapa 2), producción no funciona. Por eso **se trabaja sobre la rama `demo`**:
 
-1. *Settings → Git → Production Branch* → escribir `produccion` (la rama todavía no existe; Vercel lo acepta).
-2. Desde ese momento, cada push a `main` crea un deploy de Preview con su URL. La URL fija de la rama queda como `soporte-bi-git-main-<equipo>.vercel.app`.
+1. Cada push a `demo` crea un deploy de **Preview**, que lee `DEMO_MODE=true`. La URL fija de la rama queda como `soporte-bi-git-demo-<equipo>.vercel.app` (se ve en *Deployments* filtrando por la rama).
+2. No usar el deploy de producción (`main`) hasta la etapa 2: no tiene variables y responde con error.
 3. Opcional: *Settings → Deployment Protection* → **Vercel Authentication** activado para Preview (solo gente del equipo de Vercel ve la demo).
 
 ### 1.3 Verificar el preview
@@ -46,8 +46,8 @@ Hobby alcanza para pruebas. **Antes de dar acceso a clientes** pasar a **Pro** (
 
 ## 2. GitHub ✅
 
-- El CI (`.github/workflows/ci.yml`) corre en cada push a `main` y en PRs: audit, lint, tipos, tests, build y e2e.
-- Recomendado: *Settings → Branches → Branch protection* sobre `main`: requerir el check **"Lint, tipos, tests, build y e2e"**, prohibir *force push* y borrado de la rama.
+- El CI (`.github/workflows/ci.yml`) corre en cada push a `main` o `demo` y en PRs: audit, lint, tipos, tests, build y e2e.
+- Recomendado: *Settings → Branches → Branch protection* sobre `main` y `demo`: requerir el check **"Lint, tipos, tests, build y e2e"**, prohibir *force push* y borrado de la rama.
 - *Settings → Actions → General*: "Workflow permissions" en **Read repository contents** (el workflow ya pide `contents: read`).
 
 ---

@@ -4,6 +4,16 @@ Una entrada al terminar cada tarea: fecha, qué se hizo, decisiones y pendientes
 
 ---
 
+## 2026-10-06 · Cambio a la rama `demo`
+
+**Qué se hizo:** se creó la rama `demo` desde el cierre de la etapa 0 y desde ahora se trabaja ahí. El CI también corre en `demo`. Se actualizaron `AGENTS.md`, `DEPLOY.md` y `DECISIONES.md`.
+
+**Decisiones:** ADR-011 (reemplaza a ADR-010): en Vercel no está disponible cambiar la *Production Branch*, así que `demo` se despliega como Preview con `DEMO_MODE=true` y `main` queda como producción, congelada hasta la etapa 2.
+
+**Pendientes:** verificar el preview de `demo` en Vercel con `DEMO_MODE=true` cargada para Preview.
+
+---
+
 ## 2026-10-06 · Etapa 0 — Base
 
 **Qué se hizo**

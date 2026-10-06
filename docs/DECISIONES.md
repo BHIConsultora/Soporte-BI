@@ -65,8 +65,15 @@ Formato: contexto → decisión → consecuencias. Las decisiones se agregan, no
 - **Consecuencias:** las áreas de un ticket nunca se copian al ticket; un tablero compartido entre áreas aparece para los líderes de todas ellas.
 
 ## ADR-010 · Vercel: rama de producción separada hasta tener auth real
-**Fecha:** 2026-10-06 · **Estado:** propuesta (requiere acción del admin de Vercel)
+**Fecha:** 2026-10-06 · **Estado:** reemplazada por ADR-011
 
 - **Contexto:** sin login real (etapa 2) un deploy de producción no funcionaría, y producción nunca puede tener `DEMO_MODE=true`. Se trabaja directo sobre `main`.
 - **Decisión:** en Vercel, configurar como *Production Branch* una rama `produccion` (que todavía no existe). Así cada push a `main` genera un deploy de **Preview** con `DEMO_MODE=true`.
 - **Consecuencias:** cuando la etapa 2 esté lista se crea `produccion` desde `main` (o se vuelve a `main` como rama de producción). Ver `DEPLOY.md`.
+
+## ADR-011 · Se trabaja sobre la rama `demo`
+**Fecha:** 2026-10-06 · **Estado:** aceptada (pedido de Martín)
+
+- **Contexto:** en Vercel no aparece la opción para cambiar la *Production Branch*, así que ADR-010 no se puede aplicar. `main` es la rama de producción de Vercel.
+- **Decisión:** todo el desarrollo pasa a la rama `demo`. Vercel la despliega como **Preview**, donde se lee `DEMO_MODE=true`. `main` queda congelada en el cierre de la etapa 0 y solo se actualiza cuando haya auth real y se decida pasar a producción. El CI corre en `main` y en `demo`. Se mantienen las reglas: commits chicos, nada de reescribir historia, checks en verde antes de cada push.
+- **Consecuencias:** el deploy de producción de `main` no tiene `DEMO_MODE` ni credenciales: hasta la etapa 2 responde con error al entrar (es esperable; no usarlo). Para pasar a producción se hace un merge de `demo` a `main` (sin *force push*).

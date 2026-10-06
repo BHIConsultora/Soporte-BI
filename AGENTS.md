@@ -9,7 +9,7 @@ Guía para agentes (Claude Code y otros) que trabajen en este repo.
 
 ## Reglas
 
-- Se trabaja directo sobre `main`. Commits chicos con prefijo (`feat:`, `fix:`, `chore:`, `test:`, `docs:`), en castellano.
+- Se trabaja directo sobre la rama **`demo`** (deploy de Preview en Vercel con `DEMO_MODE=true`; ver ADR-011). `main` queda como rama de producción y se actualiza solo cuando se decida pasar a producción. Commits chicos con prefijo (`feat:`, `fix:`, `chore:`, `test:`, `docs:`), en castellano.
 - **Nunca reescribir historia publicada**: sin `push --force`, sin `rebase`/`amend` de commits pusheados, sin `reset` remoto.
 - Antes de cada push: `bun run lint`, `bun run typecheck`, `bun run test` y `bun run build` en verde.
 - Gestor de paquetes: **bun**. No usar npm/yarn/pnpm ni generar otros lockfiles. `bunfig.toml` mantiene `minimumReleaseAge = 86400`.

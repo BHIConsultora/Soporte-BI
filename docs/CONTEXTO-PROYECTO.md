@@ -276,7 +276,7 @@ En modo demo solo se usa `DEMO_MODE`; `SESSION_SECRET` es opcional (si falta se 
 
 | Etapa | Entrega | Hecho cuando | Estado |
 |---|---|---|---|
-| 0. Base | Limpieza de Lovable, Next.js + bun, identidad visual, layout, modo demo, CI, `docs/` | CI verde; deploy en Vercel preview en modo demo | ✅ código · preview depende de conectar Vercel |
+| 0. Base | Limpieza de Lovable, Next.js + bun, identidad visual, layout, modo demo, CI, `docs/` | CI verde; deploy en Vercel preview en modo demo | ✅ código · preview desde la rama `demo` (ADR-011) |
 | 1. UI completa en demo | Todas las pantallas de §10 contra `DemoRepo`, kanban, admin | Recorridos de Playwright de los 5 roles | |
 | 2. Auth real | MSAL Node + federación Vercel, sesión, rol (tenant, satélite, BHI), consentimiento, solicitudes | Matriz de autorización verde; guía de Entra en `DEPLOY.md` | |
 | 3. SharePoint | `SharePointRepo`, adjuntos, `provision.ts` + workflow | Contrato del repo contra mock de Graph; dry run documentado | |
