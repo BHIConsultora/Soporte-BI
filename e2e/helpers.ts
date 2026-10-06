@@ -1,13 +1,44 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, type Page } from "@playwright/test";
+import { expect, test as base, type Page } from "@playwright/test";
 
-/** Entra con la persona por defecto y, si hace falta, cambia a otra desde el selector demo. */
+export const ORIGEN = "http://localhost:3100";
+
+/** Cada test arranca con los datos demo iniciales. */
+export const test = base.extend<{ demoLimpia: void }>({
+  demoLimpia: [
+    async ({ request }, usar) => {
+      const r = await request.post("/api/demo/reiniciar", { headers: { origin: ORIGEN } });
+      expect(r.status()).toBe(204);
+      await usar();
+    },
+    { auto: true },
+  ],
+});
+export { expect };
+
+/** Inicia sesión como una persona demo (rápido: sin pasar por el selector flotante). */
 export async function entrarComo(page: Page, persona: string, volver = "/") {
-  await page.goto(`/api/auth/login?volver=${encodeURIComponent(volver)}`);
-  if (persona === "usuario") return;
+  const r = await page.request.post("/api/demo/persona", {
+    form: { persona, volver },
+    headers: { origin: ORIGEN },
+    maxRedirects: 0,
+  });
+  expect(r.status()).toBe(303);
+  await page.goto(volver);
+}
+
+/** Entra con el selector flotante del modo demo, como lo haría una persona. */
+export async function cambiarPersonaConSelector(page: Page, persona: string) {
   await page.getByText("Modo demo · cambiar persona").click();
   await page.getByLabel("Entrar como").selectOption(persona);
   await page.getByRole("button", { name: "Cambiar" }).click();
+}
+
+/** Links visibles a tickets (tabla en escritorio, tarjetas en mobile). */
+export const linksTickets = (page: Page) => page.getByRole("link", { name: /^TCK-\d{4}$/ });
+
+export async function idsVisibles(page: Page): Promise<string[]> {
+  return (await linksTickets(page).allTextContents()).sort();
 }
 
 export async function sinViolacionesSerias(page: Page) {
@@ -20,3 +51,5 @@ export async function sinScrollHorizontal(page: Page) {
   const desborda = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   expect(desborda).toBe(false);
 }
+
+export const esMobile = (page: Page) => (page.viewportSize()?.width ?? 1280) < 768;

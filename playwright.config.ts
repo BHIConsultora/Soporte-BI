@@ -3,10 +3,15 @@ import { defineConfig, devices } from "@playwright/test";
 const PORT = 3100;
 const isCI = !!process.env.CI;
 
-/** E2E siempre en modo demo. En CI se usa el build ya generado (`next start`). */
+/**
+ * E2E siempre en modo demo. En CI se usa el build ya generado (`next start`).
+ * Un solo worker: todos los tests comparten el repositorio demo en memoria del servidor
+ * y cada uno lo reinicia al empezar (`/api/demo/reiniciar`).
+ */
 export default defineConfig({
   testDir: "./e2e",
-  fullyParallel: true,
+  fullyParallel: false,
+  workers: 1,
   forbidOnly: isCI,
   retries: isCI ? 1 : 0,
   reporter: isCI ? [["github"], ["html", { open: "never" }]] : "list",
