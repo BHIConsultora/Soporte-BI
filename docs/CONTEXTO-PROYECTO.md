@@ -2,7 +2,7 @@
 
 > **Fuente de verdad del diseño.** Si algo del código contradice este documento, gana este documento (o se actualiza acá con una decisión en `DECISIONES.md`).
 > BHI Consultora Regional · Responsable: Martín Lasserre (mlasserre@bhiconsultora.com.ar)
-> Última actualización: 2026-10-06 (cierre de la etapa 1).
+> Última actualización: 2026-10-06 (cierre de la etapa 2).
 
 ## 1. Qué resuelve
 
@@ -32,8 +32,8 @@ Sistema de gestión de reclamos sobre los tableros de Power BI que BHI mantiene 
 | Framework | Next.js 16 (App Router), React 19, TypeScript 6 `strict` | ✅ etapa 0 |
 | UI | Tailwind CSS v4, shadcn/ui (paquete `radix-ui`), lucide-react; modales con `<dialog>` nativo (sin sonner, ADR-012); kanban con `@dnd-kit/core` | ✅ |
 | Formularios / validación | react-hook-form + zod 4 (mismos esquemas en cliente y servidor, `dominio/esquemas.ts`) | ✅ |
-| Auth | `@azure/msal-node` (auth code + PKCE) con `clientAssertion` = token OIDC de Vercel; sesión en cookie cifrada con `jose` (JWE `dir` + `A256GCM`) | sesión ✅ · MSAL etapa 2 |
-| Graph | `fetch` propio tipado, caché de token de app, reintentos con backoff ante 429/503 con `Retry-After`, paginación `@odata.nextLink` | etapa 3 |
+| Auth | `@azure/msal-node` (auth code + PKCE) con `clientAssertion` = token OIDC de Vercel; sesión en cookie cifrada con `jose` (JWE `dir` + `A256GCM`); ID token validado con jose (ADR-018) | ✅ |
+| Graph | `fetch` propio tipado, caché de token de app, reintentos con backoff ante 429/503 con `Retry-After`, paginación `@odata.nextLink` | ✅ cliente base (`infra/graph`) · uso en etapa 3 |
 | MCP | `mcp-handler` o `@modelcontextprotocol/sdk` sobre un route handler, Streamable HTTP | etapa 5 |
 | Fechas | date-fns + `@date-fns/tz` (`America/Argentina/Buenos_Aires`) | ✅ |
 | Tests | Vitest (unit/integración), Playwright (e2e en modo demo) + `@axe-core/playwright` | ✅ |
@@ -76,7 +76,7 @@ El conector MCP de Claude usa la app Portal (mismo login, rol `Soporte` requerid
 1. **Cliente con tenant propio** (ej.: ENA): se identifica por `tid`.
 2. **Cliente satélite**: sus usuarios son **cuentas miembro dentro del tenant de BHI**. Se identifica por pertenencia a un **grupo de seguridad de Entra** del tenant de BHI (uno por cliente satélite, asignado a la app Portal). El grupo llega en el claim `groups` del ID token.
    - Si un usuario pertenece a más de un grupo satélite: selector de cliente tras el login (`/elegir-cliente`; la elección se guarda en la sesión y se revalida contra los grupos en cada request). ✅ etapa 0 en demo.
-   - Si el token trae overage de grupos (`_claim_names`), resolver con Graph `memberOf` filtrado por los grupos configurados y documentar el permiso necesario. (etapa 2)
+   - Si el token trae overage de grupos (`_claim_names`), se resuelve con Graph `checkMemberGroups` solo con los grupos satélite configurados (`GroupMember.Read.All` en la app Datos, opcional; sin él falla cerrado). ✅ ADR-021
 3. **BHI como cliente de prueba** (piloto interno): BHI se da de alta en "Clientes BI" con tipo satélite y un grupo "Piloto Soporte BI".
 
 > ⚠️ **Pendiente de confirmar con Martín antes de la etapa 2:** si algún satélite usa cuentas invitadas (B2B) en lugar de miembros. Cambia la autoridad de login y la validación (hoy un invitado del tenant de BHI recibe 403).
@@ -99,11 +99,11 @@ rol de cliente:
   si no → usuario
 ```
 
-Emails en minúsculas. La sesión guarda la identidad del token (`oid`, `tid`, `email`, `nombre`, app roles, grupos, invitado) y `clienteElegidoId`; **rol y áreas se recalculan en el servidor** (con caché ≤ 5 min a partir de la etapa 3) para que las bajas impacten rápido. Los app roles y grupos solo se consideran dentro del tenant de BHI.
+Emails en minúsculas. La sesión guarda la identidad del token (`oid`, `tid`, `email`, `nombre`, app roles, grupos, invitado), `clienteElegidoId` y la hora del login; **rol y áreas se recalculan en el servidor** con caché de 120 s (ADR-019) para que las bajas impacten rápido. Los app roles y grupos solo se consideran dentro del tenant de BHI. Invitado = `acct = 1` o `idp` externo (ADR-021).
 
 ### 4.4 Consentimiento
 
-Si el login falla por falta de consentimiento (`AADSTS65001` y similares), pantalla `/consentimiento` que explica el paso y ofrece copiar el link de admin consent: `https://login.microsoftonline.com/organizations/adminconsent?client_id=<PORTAL_CLIENT_ID>&redirect_uri=<...>`. (etapa 2)
+Si el login falla por falta de consentimiento (`AADSTS65001` y similares), pantalla `/consentimiento` que explica el paso y ofrece copiar el link de admin consent: `https://login.microsoftonline.com/organizations/adminconsent?client_id=<PORTAL_CLIENT_ID>&redirect_uri=<APP_URL>/consentimiento`. ✅ (AADSTS65001, 65004, 90094, 90008, 650052, 700016 → `/consentimiento`)
 
 ## 5. Roles y permisos
 
@@ -199,8 +199,8 @@ Errores: `{ error: string, code?: string, requestId }`; códigos `401`, `403 { c
 
 | Control | Implementación | Estado |
 |---|---|---|
-| Sesión | Cookie `__Host-sbi_sesion`, `httpOnly`, `Secure`, `SameSite=Lax`, JWE; expira a las 8 h; renovación deslizante; logout borra la cookie | ✅ (deslizante: etapa 2) |
-| CSRF | Mutaciones solo `POST/PATCH/DELETE` con verificación de `Origin` + token de doble envío | Origin ✅ · token etapa 2 |
+| Sesión | Cookie `__Host-sbi_sesion`, `httpOnly`, `Secure`, `SameSite=Lax`, JWE; expira a las 8 h sin actividad (renovación deslizante), tope 24 h; logout borra la cookie | ✅ |
+| CSRF | Mutaciones solo `POST/PATCH/DELETE` con verificación de `Origin` + token de doble envío | ✅ (ADR-020) |
 | Validación | zod en cada handler; longitudes máximas; enums | ✅ |
 | Adjuntos | Máx. 3 por mensaje, 4 MB c/u, 10 MB por request. PNG, JPEG, WebP, PDF, XLSX, CSV. Verificación por **magic bytes** (CSV: UTF-8 válido sin nulos; XLSX: ZIP con `[Content_Types].xml` y **sin** `vbaProject.bin`). Rechazar SVG, XLSM, ejecutables. Nombre UUID | ✅ validación · ⚠️ límite de ~4,5 MB por request en Vercel (§18) |
 | Rate limit | Por `oid` en creación de tickets y comentarios (ventana deslizante; documentar la limitación sin estado; Vercel Firewall cuando el plan lo permita) | etapa 6 |
@@ -277,8 +277,8 @@ En modo demo solo se usa `DEMO_MODE`; `SESSION_SECRET` es opcional (si falta se 
 | Etapa | Entrega | Hecho cuando | Estado |
 |---|---|---|---|
 | 0. Base | Limpieza de Lovable, Next.js + bun, identidad visual, layout, modo demo, CI, `docs/` | CI verde; deploy en Vercel preview en modo demo | ✅ aprobada 2026-10-06 (preview desde la rama `demo`) |
-| 1. UI completa en demo | Todas las pantallas de §10 contra `DemoRepo`, kanban, admin | Recorridos de Playwright de los 5 roles | ✅ código · a aprobar en el preview |
-| 2. Auth real | MSAL Node + federación Vercel, sesión, rol (tenant, satélite, BHI), consentimiento, solicitudes | Matriz de autorización verde; guía de Entra en `DEPLOY.md` | |
+| 1. UI completa en demo | Todas las pantallas de §10 contra `DemoRepo`, kanban, admin | Recorridos de Playwright de los 5 roles | ✅ aprobada 2026-10-06 |
+| 2. Auth real | MSAL Node + federación Vercel, sesión, rol (tenant, satélite, BHI), consentimiento, solicitudes | Matriz de autorización verde; guía de Entra en `DEPLOY.md` | ✅ código y guía · falta probar con las apps reales (§3.5) |
 | 3. SharePoint | `SharePointRepo`, adjuntos, `provision.ts` + workflow | Contrato del repo contra mock de Graph; dry run documentado | |
 | 4. Notificaciones y cron | Correo, Teams, cierre automático, SLA | Tests de plantillas y del cron | |
 | 5. MCP | Servidor, OAuth, herramientas, prompt de triage; triage por API desactivado | Conector agregado en Claude Pro procesando un ticket de prueba | |
@@ -291,6 +291,6 @@ Multicanal (WhatsApp/Copilot Studio), Dataverse, otros idiomas, migración de ti
 ## 18. Preguntas abiertas
 
 1. ¿Algún cliente satélite usa cuentas invitadas (B2B)? (antes de la etapa 2)
-2. App roles y grupos: hoy se toman del ID token al iniciar sesión y viven en la sesión (≤ 8 h). Si se quiere que una baja de rol de soporte impacte antes, hace falta consultar Graph (`appRoleAssignments`) con caché corta. A decidir en la etapa 2.
+2. ~~App roles y grupos en la sesión~~ → decidido en ADR-019 (del token; impacto máximo 8 h sin actividad / 24 h; rotar `SESSION_SECRET` para cortar ya).
 3. **Tamaño de adjuntos vs. Vercel:** una función de Vercel acepta como máximo ~4,5 MB por request y el diseño permite 10 MB por mensaje. Propuesta: subir cada adjunto en su propio request (≤ 4 MB) antes de mandar el mensaje. A decidir antes de la etapa 3.
 4. **SLA:** ¿"24 h / 72 h hábiles" son horas hábiles literales (implementado) o 1 / 3 días hábiles? (ADR-013)

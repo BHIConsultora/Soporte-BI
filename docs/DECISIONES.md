@@ -124,3 +124,40 @@ Formato: contexto → decisión → consecuencias. Las decisiones se agregan, no
 
 - `@dnd-kit/core` con un **botón asa** por tarjeta ("Mover TCK-0001"), separado del link y del botón "Tomar" (evita elementos interactivos anidados). Con teclado: Espacio agarra, ← / → saltan de columna, Espacio suelta, Escape cancela; anuncios en castellano.
 - En mobile las columnas son un carrusel horizontal; el cambio de estado accesible es desde el detalle del ticket.
+
+## ADR-018 · Login con MSAL Node y validación propia del ID token
+**Fecha:** 2026-10-06 · **Estado:** aceptada
+
+- **Decisión:**
+  - Flujo *authorization code* + PKCE (S256) del lado del servidor, autoridad `organizations`, `prompt=select_account`.
+  - `state`, `nonce`, `code_verifier` y la URL de retorno viajan en una cookie cifrada de un solo uso (`__Host-sbi_login`, 10 min, clave propia). El diseño pedía guardar los parámetros en el `state`; ponerlos en una cookie atada al navegador es equivalente y no expone la URL en el `state`.
+  - MSAL canjea el código usando el token OIDC de Vercel como `client_assertion`. Se crea un cliente por login, así la caché de MSAL nunca mezcla usuarios, y no se guardan tokens de Microsoft.
+  - Además de MSAL, el **ID token se valida con jose**: firma RS256 contra las claves de Microsoft, audiencia = app Portal, emisor construido con el `tid` del propio token, nonce, `exp`/`nbf`. La identidad sale solo de ahí.
+- **Consecuencias:** el login no depende de que MSAL valide la firma, y la validación tiene tests propios con claves generadas.
+
+## ADR-019 · Qué vive en la sesión y cuánto dura
+**Fecha:** 2026-10-06 · **Estado:** aceptada (responde la pregunta abierta 2 del contexto)
+
+- **Decisión:** la sesión guarda la identidad del ID token: `oid`, `tid`, email, nombre, app roles, grupos y si es invitado. Además guarda el cliente elegido y la hora del login.
+  - Rol de cliente, áreas y estado del cliente se **recalculan en el servidor** en cada request, con caché por instancia de 120 s (configurable hasta 300 s; 0 en demo). Las denegaciones no se cachean.
+  - Roles de BHI y grupos vienen del token. Como la sesión vence a las **8 h sin actividad** (renovación deslizante cada 10 min) y tiene **tope absoluto de 24 h**, una baja en Entra impacta como máximo en ese plazo. Para cortar el acceso de alguien ya mismo, rotar `SESSION_SECRET` invalida todas las sesiones.
+- **Alternativa descartada:** consultar `appRoleAssignments` en Graph en cada request; suma un permiso de directorio y latencia para un caso raro.
+
+## ADR-020 · CSRF de doble envío
+**Fecha:** 2026-10-06 · **Estado:** aceptada
+
+- **Decisión:** `proxy.ts` pone `__Host-sbi_csrf` (aleatoria, legible por JS, `Secure`, `SameSite=Lax`) en cada página si falta. Toda mutación de la API exige `Origin` del portal **y** el header `x-csrf-token` igual a la cookie (comparación en tiempo constante). Los formularios HTML (selector demo, elegir cliente) lo mandan como campo `csrf`. `/api/demo/reiniciar` (solo demo, solo e2e) queda con verificación de `Origin`.
+- **Consecuencias:** las llamadas desde el navegador usan siempre `llamarApi`, que agrega el header.
+
+## ADR-021 · Detección de invitados y overage de grupos
+**Fecha:** 2026-10-06 · **Estado:** aceptada
+
+- **Invitado:** el claim opcional `acct = 1`, **o** un `idp` distinto del emisor (cubre el caso de que falte `acct`). Un invitado en el tenant de BHI recibe 403 aunque tenga un app role asignado. Mientras no se confirme lo de satélites con cuentas B2B (pregunta abierta 1), se mantiene este criterio: falla cerrado.
+- **Overage:** si el token no trae los grupos, se consulta Graph `checkMemberGroups` **solo** con los grupos satélite configurados en "Clientes BI". Requiere `GroupMember.Read.All` en la app Datos, que es opcional: sin el permiso, o si Graph falla, la persona queda sin grupos (falla cerrado).
+
+## ADR-022 · Login real también en el preview de la demo
+**Fecha:** 2026-10-06 · **Estado:** aceptada
+
+- **Contexto:** hasta la etapa 3 no hay SharePoint, así que producción no funciona. Igual hay que probar el login real.
+- **Decisión:** con `DEMO_MODE=true` **y** las variables de Entra cargadas, la bienvenida ofrece el login real y el de persona demo. Las identidades reales se resuelven contra los datos demo, y tanto el tenant ficticio de BHI como el real cuentan como BHI.
+- **Consecuencias:** el criterio de la etapa 2 se verifica en el preview (`DEPLOY.md` §3.5). La guarda de producción sigue igual: `DEMO_MODE` nunca en Production.

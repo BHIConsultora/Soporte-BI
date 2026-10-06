@@ -4,6 +4,37 @@ Una entrada al terminar cada tarea: fecha, qué se hizo, decisiones y pendientes
 
 ---
 
+## 2026-10-06 · Etapa 2 — Login real con Microsoft
+
+**Qué se hizo**
+
+- **Login:**
+  - `/api/auth/login` arma el *authorization code* + PKCE con MSAL Node (autoridad `organizations`), con `state`/`nonce`/`code_verifier` y la URL de retorno en una cookie cifrada de un solo uso.
+  - `/api/auth/callback` valida el `state`, canjea el código con la credencial federada de Vercel (`@vercel/oidc` como `client_assertion`) y valida el ID token con jose (firma, emisor por `tid`, audiencia, nonce). Después resuelve el overage de grupos si hace falta, crea la sesión y registra la solicitud de acceso si la organización no está habilitada.
+  - Los errores de Entra se traducen: falta de consentimiento → `/consentimiento`; usuario no asignado → "no habilitado"; cancelación → aviso en la bienvenida.
+- **Sesión:** JWE con claves derivadas por propósito, vencimiento a las 8 h sin actividad con renovación deslizante en `proxy.ts`, tope absoluto de 24 h y caché del acceso por instancia (120 s, 0 en demo).
+- **CSRF:** token de doble envío en todas las mutaciones, además del `Origin`.
+- **Graph:** cliente mínimo (token de app con MSAL + federación, reintentos con `Retry-After`, paginación); por ahora solo lo usa el overage de grupos.
+- **Modo demo:** si en el preview se cargan las variables de Entra, conviven el login real y las personas demo.
+- **Entorno:** producción exige `APP_URL`, `SESSION_SECRET`, `BHI_TENANT_ID` y `PORTAL_CLIENT_ID`. El resto se valida donde se usa.
+- **Docs:** guía completa de Entra ID y Vercel en `DEPLOY.md` §3 (apps, redirect URIs, claims, app roles, asignación, credenciales federadas, variables y cómo probar).
+- **Tests:**
+  - 242 de Vitest: los de antes más ID token (firma, audiencia, emisor, nonce, alg none, invitados, overage), transacción PKCE, errores de Entra, CSRF, caché de acceso, sesión deslizante y tope, entorno, cliente de Graph (reintentos, `Retry-After`, sin filtrar cuerpos) y overage.
+  - 72 de Playwright: suma CSRF, atributos de cookies y la ruta de error del login.
+  - La matriz de autorización sigue verde.
+
+**Decisiones:** ADR-018 a ADR-022.
+
+**No verificado (requiere las apps de Entra):** el login real de punta a punta (canje con la credencial federada, claims reales y consentimiento de otra organización). Está cubierto por partes con tests, pero falta probarlo con las apps reales siguiendo `DEPLOY.md` §3.5.
+
+**Pendientes**
+
+- Martín: crear las apps y credenciales (§3), cargar las variables en Preview y probar la tabla de §3.5.
+- Sigue abierta la pregunta de satélites con cuentas B2B (hoy: invitado = sin acceso).
+- Etapa 3: `SharePointRepo`, adjuntos en la biblioteca (subida de a un archivo por el límite de Vercel), `provision.ts`.
+
+---
+
 ## 2026-10-06 · Etapa 1 — UI completa en modo demo
 
 **Qué se hizo**
