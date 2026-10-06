@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { rutaInternaSegura } from "@/infra/csrf";
-import { sesionDemo } from "@/infra/demo-sesion";
+import { iniciarSesion, sesionDemo } from "@/infra/demo-sesion";
 import { isDemoMode } from "@/infra/env";
 import { conManejoDeErrores, errorJson } from "@/infra/http";
-import { guardarSesion } from "@/infra/sesion";
 
 export const GET = conManejoDeErrores(async (request, requestId) => {
   const volver = rutaInternaSegura(new URL(request.url).searchParams.get("volver"));
@@ -11,7 +10,7 @@ export const GET = conManejoDeErrores(async (request, requestId) => {
   if (isDemoMode()) {
     const sesion = await sesionDemo("usuario");
     if (!sesion) return errorJson(requestId, 500, "Falta la persona demo por defecto.");
-    await guardarSesion(sesion);
+    await iniciarSesion(sesion);
     return NextResponse.redirect(new URL(volver, request.url), 303);
   }
 

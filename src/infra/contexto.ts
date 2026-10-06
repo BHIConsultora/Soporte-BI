@@ -1,11 +1,11 @@
 import "server-only";
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 import { DEMO_BHI_TENANT_ID } from "@/repositorio/demo/constantes";
 import { getRepositorio } from "@/repositorio";
-import { resolverAcceso, type Acceso, type Identidad } from "@/servicios/acceso";
-import type { ContextoAutorizado } from "@/servicios/tickets";
+import { resolverAcceso, type Acceso, type ContextoAutorizado, type Identidad } from "@/servicios/acceso";
+import type { ContextoBhi, ContextoCliente } from "@/servicios/autorizacion";
 import { getEnv } from "./env";
 import { leerSesion, type Sesion } from "./sesion";
 
@@ -46,4 +46,24 @@ export async function requerirContexto(): Promise<ContextoAutorizado & { sesion:
   if (acceso.tipo === "denegado") redirect(`/no-habilitado?motivo=${acceso.code}`);
   if (acceso.tipo === "elegir_cliente") redirect("/elegir-cliente");
   return { sesion: ctx.sesion, identidad: ctx.identidad, acceso };
+}
+
+/** Pantallas de cliente. El equipo de BHI va a su propio inicio (kanban). */
+export async function requerirCliente(): Promise<ContextoCliente> {
+  const ctx = await requerirContexto();
+  if (ctx.acceso.tipo !== "cliente") redirect("/soporte");
+  return ctx as ContextoCliente;
+}
+
+/** Pantallas de soporte: para un cliente no existen (404). */
+export async function requerirSoporte(): Promise<ContextoBhi> {
+  const ctx = await requerirContexto();
+  if (ctx.acceso.tipo !== "bhi") notFound();
+  return ctx as ContextoBhi;
+}
+
+export async function requerirAdmin(): Promise<ContextoBhi> {
+  const ctx = await requerirSoporte();
+  if (ctx.acceso.rol !== "admin") notFound();
+  return ctx;
 }

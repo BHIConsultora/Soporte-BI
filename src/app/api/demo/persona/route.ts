@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { origenValido, rutaInternaSegura } from "@/infra/csrf";
-import { sesionDemo } from "@/infra/demo-sesion";
+import { iniciarSesion, sesionDemo } from "@/infra/demo-sesion";
 import { getEnv, isDemoMode } from "@/infra/env";
 import { conManejoDeErrores, errorJson } from "@/infra/http";
-import { guardarSesion } from "@/infra/sesion";
 
 /** Cambia la persona de la sesión. Solo existe en modo demo. */
 export const POST = conManejoDeErrores(async (request, requestId) => {
@@ -14,7 +13,7 @@ export const POST = conManejoDeErrores(async (request, requestId) => {
   const sesion = await sesionDemo(String(form.get("persona") ?? ""));
   if (!sesion) return errorJson(requestId, 422, "Persona demo desconocida.");
 
-  await guardarSesion(sesion);
+  await iniciarSesion(sesion);
   const volver = rutaInternaSegura(String(form.get("volver") ?? "/"));
   return NextResponse.redirect(new URL(volver, request.url), 303);
 });
