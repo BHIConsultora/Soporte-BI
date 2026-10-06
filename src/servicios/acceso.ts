@@ -32,6 +32,15 @@ export type Acceso =
 
 export type AreaLiderada = Area & { tableroIds: string[] };
 
+export type AccesoCliente = Extract<Acceso, { tipo: "cliente" }>;
+export type AccesoBhi = Extract<Acceso, { tipo: "bhi" }>;
+
+/** Contexto ya autenticado y con acceso resuelto (nunca `denegado` ni `elegir_cliente`). */
+export interface ContextoAutorizado {
+  identidad: Identidad;
+  acceso: AccesoBhi | AccesoCliente;
+}
+
 export interface OpcionesAcceso {
   bhiTenantId: string;
   /** Cliente elegido en la sesión (solo relevante para satélites en varios grupos). */
@@ -86,4 +95,31 @@ async function rolDeCliente(email: string, cliente: Cliente, repo: Repositorio):
   const rol: RolCliente = esReferente ? "referente" : areasLideradas.length > 0 ? "lider" : "usuario";
 
   return { tipo: "cliente", rol, cliente, areasLideradas, tablerosDeAreas };
+}
+
+/**
+ * Si el tenant no está habilitado, deja una solicitud de acceso pendiente (una por email y tenant).
+ * Se llama al iniciar sesión, no en cada request.
+ */
+export async function registrarSolicitudSiCorresponde(
+  identidad: Identidad,
+  acceso: Acceso,
+  repo: Repositorio,
+  ahora: Date = new Date(),
+): Promise<void> {
+  if (acceso.tipo !== "denegado" || acceso.code !== "tenant_no_habilitado") return;
+  const email = lower(identidad.email);
+  const existentes = await repo.solicitudes.listar();
+  const yaPendiente = existentes.some(
+    (s) => s.estado === "pendiente" && lower(s.email) === email && lower(s.tenantId) === lower(identidad.tid),
+  );
+  if (yaPendiente) return;
+  await repo.solicitudes.crear({
+    tenantId: identidad.tid,
+    dominio: email.split("@")[1] ?? null,
+    email,
+    nombre: identidad.nombre,
+    fecha: ahora.toISOString(),
+    estado: "pendiente",
+  });
 }

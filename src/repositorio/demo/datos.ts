@@ -1,4 +1,5 @@
-import { PRIORIDAD_INICIAL } from "@/dominio/catalogos";
+import { ESTADOS_ABIERTOS, PRIORIDAD_INICIAL } from "@/dominio/catalogos";
+import { calcularVenceSLA } from "@/dominio/sla";
 import type {
   Area,
   Cliente,
@@ -76,7 +77,6 @@ export interface DatosDemo {
 export function crearDatosDemo(ahora: Date = new Date()): DatosDemo {
   const hace = (dias: number, horas = 0) =>
     new Date(ahora.getTime() - (dias * 24 + horas) * 3_600_000).toISOString();
-  const en = (horas: number) => new Date(ahora.getTime() + horas * 3_600_000).toISOString();
 
   const clientes: Cliente[] = [
     { id: CLIENTE.piloto, nombre: "BHI Consultora (piloto)", tipo: "satelite", tenantId: null, grupoId: DEMO_GRUPO_PILOTO, dominio: "bhi.example.com", activo: true, referentesGenerales: [], notasContexto: "Piloto interno para probar el circuito completo." },
@@ -98,7 +98,7 @@ export function crearDatosDemo(ahora: Date = new Date()): DatosDemo {
     { tableroId: "margen-por-canal", nombre: "Margen por canal", clienteId: CLIENTE.andina, areaIds: [AREA.comercial, AREA.finanzas], paginas: ["resumen", "detalle"], activo: true },
     { tableroId: "cobranzas", nombre: "Cobranzas", clienteId: CLIENTE.andina, areaIds: [AREA.finanzas], paginas: [], activo: true },
     { tableroId: "stock-depositos", nombre: "Stock por depósito", clienteId: CLIENTE.andina, areaIds: [AREA.logistica], paginas: [], activo: true },
-    { tableroId: "acopio-granos", nombre: "Acopio de granos", clienteId: CLIENTE.litoral, areaIds: [AREA.produccion], paginas: ["campaña-actual"], activo: true },
+    { tableroId: "acopio-granos", nombre: "Acopio de granos", clienteId: CLIENTE.litoral, areaIds: [AREA.produccion], paginas: ["campana-actual"], activo: true },
     { tableroId: "liquidaciones", nombre: "Liquidaciones a productores", clienteId: CLIENTE.litoral, areaIds: [AREA.produccion], paginas: [], activo: true },
     { tableroId: "ocupacion-hotelera", nombre: "Ocupación hotelera", clienteId: CLIENTE.patagonia, areaIds: [AREA.operaciones], paginas: [], activo: true },
     { tableroId: "piloto-soporte", nombre: "Tablero piloto", clienteId: CLIENTE.piloto, areaIds: [], paginas: [], activo: true },
@@ -139,21 +139,21 @@ export function crearDatosDemo(ahora: Date = new Date()): DatosDemo {
   };
 
   const tickets: Ticket[] = [
-    t(1, { clienteId: CLIENTE.andina, tableroId: "ventas-dtc", pagina: "por-zona", contexto: { Zona: "NOA", Mes: "2026-09" }, tipo: "Dato incorrecto", descripcion: "Las ventas de la zona NOA de septiembre no coinciden con el reporte del ERP: faltan unos 2 millones.", urgencia: "Alta", estado: "Nuevo", autor: ulises, alta: hace(0, 3), venceSLA: en(20) }),
-    t(2, { clienteId: CLIENTE.andina, tableroId: "ventas-dtc", tipo: "El tablero no se actualiza", descripcion: "Desde ayer el tablero muestra datos del viernes. ¿Se cortó la actualización programada?", urgencia: "Crítica", estado: "En análisis", autor: ulises, alta: hace(1, 2), prioridad: "P1", categoria: "El tablero no se actualiza", resumenIA: "Falla de actualización programada; probable credencial vencida del origen.", procesadoIA: true, asignadoA: sofia.email, venceSLA: hace(0, 1) }),
-    t(3, { clienteId: CLIENTE.andina, tableroId: "margen-por-canal", pagina: "detalle", tipo: "Consulta", descripcion: "¿Cómo se calcula el margen del canal mayorista? Necesito explicarlo en la reunión de directorio.", urgencia: "Media", estado: "Esperando al cliente", autor: paula, alta: hace(4), categoria: "Consulta", resumenIA: "Consulta sobre la fórmula del margen mayorista.", procesadoIA: true, asignadoA: sofia.email, venceSLA: en(30) }),
-    t(4, { clienteId: CLIENTE.andina, tableroId: "cobranzas", tipo: "Error visual o de carga", descripcion: "El gráfico de antigüedad de deuda queda en blanco cuando filtro por sucursal Mendoza.", urgencia: "Media", estado: "Nuevo", autor: paula, alta: hace(0, 6), venceSLA: en(60) }),
+    t(1, { clienteId: CLIENTE.andina, tableroId: "ventas-dtc", pagina: "por-zona", contexto: { Zona: "NOA", Mes: "2026-09" }, tipo: "Dato incorrecto", descripcion: "Las ventas de la zona NOA de septiembre no coinciden con el reporte del ERP: faltan unos 2 millones.", urgencia: "Alta", estado: "Nuevo", autor: ulises, alta: hace(0, 3) }),
+    t(2, { clienteId: CLIENTE.andina, tableroId: "ventas-dtc", tipo: "El tablero no se actualiza", descripcion: "Desde ayer el tablero muestra datos del viernes. ¿Se cortó la actualización programada?", urgencia: "Crítica", estado: "En análisis", autor: ulises, alta: hace(1, 2), prioridad: "P1", categoria: "El tablero no se actualiza", resumenIA: "Falla de actualización programada; probable credencial vencida del origen.", procesadoIA: true, asignadoA: sofia.email }),
+    t(3, { clienteId: CLIENTE.andina, tableroId: "margen-por-canal", pagina: "detalle", tipo: "Consulta", descripcion: "¿Cómo se calcula el margen del canal mayorista? Necesito explicarlo en la reunión de directorio.", urgencia: "Media", estado: "Esperando al cliente", autor: paula, alta: hace(4), categoria: "Consulta", resumenIA: "Consulta sobre la fórmula del margen mayorista.", procesadoIA: true, asignadoA: sofia.email }),
+    t(4, { clienteId: CLIENTE.andina, tableroId: "cobranzas", tipo: "Error visual o de carga", descripcion: "El gráfico de antigüedad de deuda queda en blanco cuando filtro por sucursal Mendoza.", urgencia: "Media", estado: "Nuevo", autor: paula, alta: hace(0, 6) }),
     t(5, { clienteId: CLIENTE.andina, tableroId: "stock-depositos", tipo: "Acceso / permisos", descripcion: "Una persona nueva del depósito de Rosario no puede abrir el tablero, le aparece que no tiene permisos.", urgencia: "Alta", estado: "Resuelto", autor: ramiro, alta: hace(6), prioridad: "P2", categoria: "Acceso / permisos", procesadoIA: true, fechaResuelto: hace(3), asignadoA: sofia.email }),
     t(6, { clienteId: CLIENTE.andina, tableroId: "ventas-dtc", tipo: "Pedido de mejora", descripcion: "Estaría bueno poder ver las ventas comparadas contra el mismo mes del año anterior.", urgencia: "Baja", estado: "Cerrado", autor: lucia, alta: hace(40), fechaResuelto: hace(30), categoria: "Pedido de mejora", procesadoIA: true }),
-    t(7, { clienteId: CLIENTE.andina, tableroId: "margen-por-canal", tipo: "Dato incorrecto", descripcion: "El margen de supermercados aparece negativo en agosto, y no tiene sentido con lo facturado.", urgencia: "Alta", estado: "En análisis", autor: paula, alta: hace(2), prioridad: "P2", procesadoIA: true, categoria: "Dato incorrecto", resumenIA: "Margen negativo en supermercados, agosto. Revisar notas de crédito.", venceSLA: en(4) }),
+    t(7, { clienteId: CLIENTE.andina, tableroId: "margen-por-canal", tipo: "Dato incorrecto", descripcion: "El margen de supermercados aparece negativo en agosto, y no tiene sentido con lo facturado.", urgencia: "Alta", estado: "En análisis", autor: paula, alta: hace(2), prioridad: "P2", procesadoIA: true, categoria: "Dato incorrecto", resumenIA: "Margen negativo en supermercados, agosto. Revisar notas de crédito." }),
     t(8, { clienteId: CLIENTE.andina, tableroId: "cobranzas", tipo: "Otro", descripcion: "Necesitamos que el tablero de cobranzas se pueda exportar a Excel con el detalle por cliente.", urgencia: "Baja", estado: "Resuelto", autor: ulises, alta: hace(25), fechaResuelto: hace(20), procesadoIA: true, categoria: "Pedido de mejora" }),
-    t(9, { clienteId: CLIENTE.litoral, tableroId: "acopio-granos", pagina: "campaña-actual", tipo: "El tablero no se actualiza", descripcion: "El acopio de soja no se actualiza desde el lunes. ¿Puede ser el gateway?", urgencia: "Crítica", estado: "Nuevo", autor: camila, alta: hace(0, 1), venceSLA: en(6) }),
-    t(10, { clienteId: CLIENTE.litoral, tableroId: "liquidaciones", tipo: "Dato incorrecto", descripcion: "La liquidación del productor 1045 muestra el doble de kilos que el remito.", urgencia: "Alta", estado: "Esperando al cliente", autor: camila, alta: hace(3), prioridad: "P2", procesadoIA: true, categoria: "Dato incorrecto", asignadoA: sofia.email, venceSLA: en(10) }),
+    t(9, { clienteId: CLIENTE.litoral, tableroId: "acopio-granos", pagina: "campana-actual", tipo: "El tablero no se actualiza", descripcion: "El acopio de soja no se actualiza desde el lunes. ¿Puede ser el gateway?", urgencia: "Crítica", estado: "Nuevo", autor: camila, alta: hace(0, 1) }),
+    t(10, { clienteId: CLIENTE.litoral, tableroId: "liquidaciones", tipo: "Dato incorrecto", descripcion: "La liquidación del productor 1045 muestra el doble de kilos que el remito.", urgencia: "Alta", estado: "Esperando al cliente", autor: camila, alta: hace(3), prioridad: "P2", procesadoIA: true, categoria: "Dato incorrecto", asignadoA: sofia.email }),
     t(11, { clienteId: CLIENTE.litoral, tableroId: "acopio-granos", tipo: "Consulta", descripcion: "¿Qué significa la columna 'humedad ajustada'? Nadie del equipo lo sabe.", urgencia: "Baja", estado: "Cerrado", autor: camila, alta: hace(60), fechaResuelto: hace(55), procesadoIA: true, categoria: "Consulta" }),
-    t(12, { clienteId: CLIENTE.patagonia, tableroId: "ocupacion-hotelera", tipo: "Error visual o de carga", descripcion: "En el celular el mapa de ocupación no carga, en la compu sí.", urgencia: "Media", estado: "Nuevo", autor: santiago, alta: hace(1, 5), venceSLA: en(40) }),
+    t(12, { clienteId: CLIENTE.patagonia, tableroId: "ocupacion-hotelera", tipo: "Error visual o de carga", descripcion: "En el celular el mapa de ocupación no carga, en la compu sí.", urgencia: "Media", estado: "Nuevo", autor: santiago, alta: hace(1, 5) }),
     t(13, { clienteId: CLIENTE.patagonia, tableroId: "ocupacion-hotelera", tipo: "Pedido de mejora", descripcion: "Queremos agregar la temporada de invierno como filtro rápido en la portada.", urgencia: "Baja", estado: "En análisis", autor: mara, alta: hace(8), procesadoIA: true, categoria: "Pedido de mejora" }),
     t(14, { clienteId: CLIENTE.piloto, tableroId: "piloto-soporte", tipo: "Consulta", descripcion: "Ticket de prueba del piloto interno para validar el circuito de correo.", urgencia: "Media", estado: "Resuelto", autor: mara, alta: hace(12), fechaResuelto: hace(10) }),
-    t(15, { clienteId: CLIENTE.andina, tableroId: "stock-depositos", tipo: "El tablero no se actualiza", descripcion: "El stock de Córdoba sigue igual desde hace dos días aunque hubo movimientos.", urgencia: "Media", estado: "Nuevo", autor: ramiro, alta: hace(0, 20), venceSLA: en(50) }),
+    t(15, { clienteId: CLIENTE.andina, tableroId: "stock-depositos", tipo: "El tablero no se actualiza", descripcion: "El stock de Córdoba sigue igual desde hace dos días aunque hubo movimientos.", urgencia: "Media", estado: "Nuevo", autor: ramiro, alta: hace(0, 20) }),
   ];
 
   let h = 0;
@@ -169,7 +169,18 @@ export function crearDatosDemo(ahora: Date = new Date()): DatosDemo {
   const claude = { autor: "Claude", autorEsIA: true, visible: false } as const;
 
   const historial: EntradaHistorial[] = [
-    ...tickets.map((tk) => e(tk.itemId, { tipo: "estado", autor: tk.autorNombre, autorEmail: tk.autorEmail, autorEsIA: false, fecha: tk.fechaAlta, texto: "Nuevo", visible: true })),
+    ...tickets.map((tk) =>
+      e(tk.itemId, {
+        tipo: "estado",
+        autor: tk.autorNombre,
+        autorEmail: tk.autorEmail,
+        autorEsIA: false,
+        fecha: tk.fechaAlta,
+        texto: "Nuevo",
+        visible: true,
+        adjuntos: tk.itemId === 1 ? [{ id: "00000000-0000-4000-a000-000000000001", nombre: "ventas-noa-erp.csv", tipo: "text/csv", tamano: 18 }] : [],
+      }),
+    ),
     e(2, { ...claude, tipo: "nota_interna", fecha: hace(1, 1), texto: "La actualización programada falla desde el sábado con error de credenciales del origen SQL. Revisar la cuenta de servicio del gateway." }),
     e(2, { ...claude, tipo: "borrador_respuesta", fecha: hace(1, 1), texto: "¡Hola Ulises! Ya estamos revisando la actualización del tablero: encontramos un problema con la conexión al origen de datos. Te avisamos por acá apenas quede resuelto.", estadoBorrador: "pendiente" }),
     e(2, { tipo: "asignacion", autor: sofia.nombre, autorEmail: sofia.email, autorEsIA: false, fecha: hace(1), texto: sofia.email, visible: false }),
@@ -197,6 +208,13 @@ export function crearDatosDemo(ahora: Date = new Date()): DatosDemo {
   const solicitudes: SolicitudAcceso[] = [
     { id: 1, tenantId: DEMO_TENANT_NO_HABILITADO, dominio: "otra.example.com", email: "nadia@otra.example.com", nombre: "Nadia Nueva", fecha: hace(2), estado: "pendiente" },
   ];
+
+  // El vencimiento se calcula con la misma función que usa la app (desde la fecha de alta).
+  const diasFeriado = new Set(feriados.map((f) => f.fecha));
+  for (const tk of tickets) {
+    if (!ESTADOS_ABIERTOS.includes(tk.estado)) continue;
+    tk.venceSLA = calcularVenceSLA(new Date(tk.fechaAlta), tk.prioridad, diasFeriado)?.toISOString() ?? null;
+  }
 
   return { clientes, areas, tableros, tickets, historial, feriados, solicitudes };
 }
