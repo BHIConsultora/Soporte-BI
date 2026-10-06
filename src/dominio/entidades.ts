@@ -75,10 +75,16 @@ export interface Ticket {
 }
 
 export interface Adjunto {
+  /** UUID con el que se guarda el archivo (nunca el nombre original). */
   id: string;
+  /** Nombre original saneado, solo para mostrar. */
   nombre: string;
   tipo: string;
   tamano: number;
+}
+
+export interface AdjuntoGuardado extends Adjunto {
+  ticketItemId: number;
 }
 
 export interface EntradaHistorial {
