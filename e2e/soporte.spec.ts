@@ -55,7 +55,7 @@ test.describe("soporte", () => {
     // Nota interna.
     await page.getByRole("textbox", { name: "Nota interna" }).fill("Revisar la cuenta de servicio del gateway.");
     await page.getByRole("button", { name: "Agregar nota" }).click();
-    await expect(page.getByText("Revisar la cuenta de servicio del gateway.")).toBeVisible();
+    await expect(page.getByText("Revisar la cuenta de servicio del gateway.", { exact: true })).toBeVisible();
 
     // El cliente ve la respuesta publicada pero no la nota ni nada de Claude.
     await entrarComo(page, "usuario", "/tickets/TCK-0002");

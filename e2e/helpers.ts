@@ -16,10 +16,21 @@ export const test = base.extend<{ demoLimpia: void }>({
 });
 export { expect };
 
+/** Token CSRF de doble envío del navegador (lo pone el servidor al abrir cualquier página). */
+export async function tokenCsrf(page: Page): Promise<string> {
+  let cookie = (await page.context().cookies()).find((c) => c.name === "__Host-sbi_csrf");
+  if (!cookie) {
+    await page.goto("/bienvenida");
+    cookie = (await page.context().cookies()).find((c) => c.name === "__Host-sbi_csrf");
+  }
+  expect(cookie, "falta la cookie CSRF").toBeTruthy();
+  return cookie!.value;
+}
+
 /** Inicia sesión como una persona demo (rápido: sin pasar por el selector flotante). */
 export async function entrarComo(page: Page, persona: string, volver = "/") {
   const r = await page.request.post("/api/demo/persona", {
-    form: { persona, volver },
+    form: { persona, volver, csrf: await tokenCsrf(page) },
     headers: { origin: ORIGEN },
     maxRedirects: 0,
   });

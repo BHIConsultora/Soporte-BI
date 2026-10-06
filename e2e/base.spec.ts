@@ -1,4 +1,4 @@
-import { cambiarPersonaConSelector, entrarComo, expect, idsVisibles, ORIGEN, sinScrollHorizontal, sinViolacionesSerias, test } from "./helpers";
+import { cambiarPersonaConSelector, entrarComo, expect, idsVisibles, ORIGEN, sinScrollHorizontal, sinViolacionesSerias, test, tokenCsrf } from "./helpers";
 
 test.describe("base · sesión, roles y seguridad", () => {
   test("sin sesión redirige a bienvenida conservando la URL", async ({ page }) => {
@@ -110,5 +110,41 @@ test.describe("base · sesión, roles y seguridad", () => {
     expect(adjunto.status()).toBe(200);
     expect(adjunto.headers()["content-disposition"]).toContain("attachment");
     expect(adjunto.headers()["x-content-type-options"]).toBe("nosniff");
+  });
+
+  test("CSRF: una mutación sin el token de doble envío se rechaza aunque tenga sesión y origen", async ({ page }) => {
+    await entrarComo(page, "soporte");
+    const sinToken = await page.request.patch("/api/tickets/TCK-0001", { data: { estado: "Cerrado" }, headers: { origin: ORIGEN } });
+    expect(sinToken.status()).toBe(403);
+    expect(await sinToken.json()).toMatchObject({ code: "csrf" });
+    const conToken = await page.request.patch("/api/tickets/TCK-0001", {
+      data: { prioridad: "P1" },
+      headers: { origin: ORIGEN, "x-csrf-token": await tokenCsrf(page) },
+    });
+    expect(conToken.status()).toBe(200);
+  });
+
+  test("el selector demo sin token CSRF se rechaza", async ({ page }) => {
+    await page.goto("/bienvenida");
+    const r = await page.request.post("/api/demo/persona", { form: { persona: "admin", volver: "/" }, headers: { origin: ORIGEN }, maxRedirects: 0 });
+    expect(r.status()).toBe(403);
+  });
+
+  test("cookies de sesión y CSRF con prefijo __Host- y atributos seguros", async ({ page }) => {
+    await entrarComo(page, "usuario");
+    const cookies = await page.context().cookies();
+    const sesion = cookies.find((c) => c.name === "__Host-sbi_sesion")!;
+    expect(sesion).toMatchObject({ httpOnly: true, secure: true, sameSite: "Lax", path: "/" });
+    expect(sesion.expires - Date.now() / 1000).toBeLessThanOrEqual(8 * 3600 + 5);
+    const csrf = cookies.find((c) => c.name === "__Host-sbi_csrf")!;
+    expect(csrf).toMatchObject({ httpOnly: false, secure: true, sameSite: "Lax" });
+  });
+
+  test("sin variables de Entra, el login real responde 503 y el callback vuelve a bienvenida", async ({ page }) => {
+    const login = await page.request.get("/api/auth/login?modo=microsoft", { maxRedirects: 0 });
+    expect(login.status()).toBe(503);
+    await page.goto("/api/auth/callback?code=x&state=y");
+    await expect(page).toHaveURL(/\/bienvenida\?error=login/);
+    await expect(page.getByText("No pudimos completar el inicio de sesión")).toBeVisible();
   });
 });
