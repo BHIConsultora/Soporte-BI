@@ -1,24 +1,26 @@
-# Pixel Perfect
+# Portal de Soporte BI
 
-Implement exactly the screenshot and nothing else
+Gestión de reclamos sobre los tableros de Power BI que BHI Consultora Regional mantiene para sus clientes.
 
-This project was built with [Lovable](https://lovable.dev).
+- Diseño y alcance: [`docs/CONTEXTO-PROYECTO.md`](docs/CONTEXTO-PROYECTO.md)
+- Deploy y configuración de Microsoft 365 / Vercel: [`docs/DEPLOY.md`](docs/DEPLOY.md)
+- Decisiones: [`docs/DECISIONES.md`](docs/DECISIONES.md) · Bitácora: [`docs/BITACORA.md`](docs/BITACORA.md)
 
-## Build with Lovable
+## Desarrollo local
 
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/1192666c-9d0e-42a6-8e90-5f6496fe2260).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
-
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+Requiere [bun](https://bun.sh).
 
 ```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
+bun install
+cp .env.example .env.local   # DEMO_MODE=true para trabajar sin Microsoft 365
+bun run dev
 ```
+
+| Script | Qué hace |
+|---|---|
+| `bun run dev` | Servidor de desarrollo |
+| `bun run lint` | ESLint |
+| `bun run typecheck` | TypeScript sin emitir |
+| `bun run test` | Vitest |
+| `bun run e2e` | Playwright (modo demo) |
+| `bun run build` | Build de producción |
