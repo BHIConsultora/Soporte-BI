@@ -1,4 +1,5 @@
 import "server-only";
+import { configAuth } from "./auth/config";
 import { getEnv } from "./env";
 
 /**
@@ -25,8 +26,9 @@ async function guidDemo(dominio: string): Promise<string> {
 
 /** Link de consentimiento de administrador para la app Portal (§4.4). */
 export function linkConsentimiento(): string | null {
-  const env = getEnv();
-  if (env.demo) return null;
-  const redirect = `${env.APP_URL.replace(/\/+$/, "")}/consentimiento`;
-  return `https://login.microsoftonline.com/organizations/adminconsent?client_id=${env.PORTAL_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirect)}`;
+  const cfg = configAuth();
+  if (!cfg) return null;
+  // Vuelve a /consentimiento, que tiene que estar registrada como Redirect URI de la app Portal.
+  const redirect = `${cfg.appUrl}/consentimiento`;
+  return `https://login.microsoftonline.com/organizations/adminconsent?client_id=${cfg.clientId}&redirect_uri=${encodeURIComponent(redirect)}`;
 }

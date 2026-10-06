@@ -1,10 +1,12 @@
 import { FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { tokenCsrfPagina } from "@/infra/csrf-pagina";
 
 /** Selector flotante de persona (solo modo demo). Formulario HTML simple: funciona sin JS. */
 export async function DemoSwitcher({ oidActual, volver }: { oidActual: string; volver: string }) {
   const { PERSONAS_DEMO } = await import("@/repositorio/demo/datos");
   const actual = PERSONAS_DEMO.find((p) => p.oid === oidActual)?.clave ?? "usuario";
+  const csrf = await tokenCsrfPagina();
   return (
     <details className="fixed right-4 bottom-4 z-50 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border bg-surface shadow-lg open:p-4">
       <summary className="flex cursor-pointer list-none items-center gap-2 rounded-2xl px-4 py-3 font-display text-sm text-main [&::-webkit-details-marker]:hidden">
@@ -13,6 +15,7 @@ export async function DemoSwitcher({ oidActual, volver }: { oidActual: string; v
       </summary>
       <form method="post" action="/api/demo/persona" className="mt-3 space-y-3">
         <input type="hidden" name="volver" value={volver} />
+        <input type="hidden" name="csrf" value={csrf} />
         <label htmlFor="demo-persona" className="block text-sm font-semibold">
           Entrar como
         </label>
