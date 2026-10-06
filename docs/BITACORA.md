@@ -4,6 +4,14 @@ Una entrada al terminar cada tarea: fecha, qué se hizo, decisiones y pendientes
 
 ---
 
+## 2026-10-06 · Etapa 0 aprobada
+
+**Qué se hizo:** Martín verificó el deploy de Preview de la rama `demo` en Vercel funcionando en modo demo y dio por **aprobada la etapa 0**. Se cumple el criterio "CI verde; deploy en Vercel preview funcionando en modo demo".
+
+**Pendientes:** arranca la etapa 1 (todas las pantallas contra `DemoRepo`).
+
+---
+
 ## 2026-10-06 · Cambio a la rama `demo`
 
 **Qué se hizo:** se creó la rama `demo` desde el cierre de la etapa 0 y desde ahora se trabaja ahí. El CI también corre en `demo`. Se actualizaron `AGENTS.md`, `DEPLOY.md` y `DECISIONES.md`.
