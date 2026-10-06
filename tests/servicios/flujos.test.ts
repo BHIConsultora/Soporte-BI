@@ -172,14 +172,14 @@ describe("admin", () => {
     const [s] = await repo.solicitudes.listar();
     const { clienteId } = await resolverSolicitud(admin, { repo }, s!.id, "aprobada");
     expect(clienteId).not.toBeNull();
-    expect(await resolverAcceso(nadia, repo, { bhiTenantId: DEMO_BHI_TENANT_ID })).toMatchObject({ tipo: "cliente", rol: "usuario" });
+    expect(await resolverAcceso(nadia, repo, { bhiTenantIds: [DEMO_BHI_TENANT_ID] })).toMatchObject({ tipo: "cliente", rol: "usuario" });
     expect(await resultado(() => resolverSolicitud(admin, { repo }, s!.id, "rechazada"))).toBe(409);
   });
 
   it("registra una sola solicitud pendiente por persona", async () => {
     const repo = repoDemo();
     const nadia = identidadDe("no-habilitado");
-    const acceso = await resolverAcceso(nadia, repo, { bhiTenantId: DEMO_BHI_TENANT_ID });
+    const acceso = await resolverAcceso(nadia, repo, { bhiTenantIds: [DEMO_BHI_TENANT_ID] });
     await registrarSolicitudSiCorresponde(nadia, acceso, repo);
     await registrarSolicitudSiCorresponde(nadia, acceso, repo);
     expect((await repo.solicitudes.listar()).filter((s) => s.email === nadia.email)).toHaveLength(1);
@@ -195,7 +195,7 @@ describe("admin", () => {
     expect(await resultado(() => actualizarTablero(admin, { repo }, "nuevo-tablero", { ...base, tableroId: "cambiado" }))).toBe(422);
     // El líder de Finanzas ahora ve el tablero nuevo (está en dos áreas).
     const acceso = await resolverAcceso({ ...identidadDe("usuario"), email: "fernando.finanzas@andina.example.com" }, repo, {
-      bhiTenantId: DEMO_BHI_TENANT_ID,
+      bhiTenantIds: [DEMO_BHI_TENANT_ID],
     });
     expect(acceso.tipo === "cliente" && acceso.tablerosDeAreas).toContain("nuevo-tablero");
   });

@@ -1,12 +1,17 @@
 import "server-only";
-import { EncryptJWT, jwtDecrypt } from "jose";
 import { cookies } from "next/headers";
 import { z } from "zod";
-import { getEnv } from "./env";
+import type { Identidad } from "@/servicios/acceso";
+import { cifrar, descifrar } from "./cripto";
 
 /** `__Host-` exige Secure, Path=/ y sin Domain: no se puede pisar desde un subdominio. */
 export const COOKIE_SESION = "__Host-sbi_sesion";
-const DURACION_SEGUNDOS = 8 * 60 * 60;
+/** Vence a las 8 h sin actividad (renovación deslizante en `proxy.ts`). */
+export const DURACION_SESION_SEGUNDOS = 8 * 60 * 60;
+/** Tope absoluto: aunque haya actividad, a las 24 h hay que volver a iniciar sesión. */
+export const MAXIMO_SESION_SEGUNDOS = 24 * 60 * 60;
+/** Se renueva la cookie si pasaron más de 10 minutos desde la última emisión. */
+export const RENOVAR_CADA_SEGUNDOS = 10 * 60;
 
 const sesionSchema = z.object({
   identidad: z.object({
@@ -19,56 +24,62 @@ const sesionSchema = z.object({
     esInvitado: z.boolean(),
   }),
   clienteElegidoId: z.number().int().nullable(),
+  /** Momento del login (segundos epoch), para el tope absoluto. */
+  inicio: z.number().int(),
 });
 
 export type Sesion = z.infer<typeof sesionSchema>;
-
-let claveCache: { secreto: string; clave: Uint8Array } | undefined;
-
-/** Deriva una clave AES-256 del secreto (SHA-256) para `dir` + `A256GCM`. */
-async function clave(): Promise<Uint8Array> {
-  const secreto = getEnv().SESSION_SECRET;
-  if (claveCache?.secreto === secreto) return claveCache.clave;
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(secreto));
-  claveCache = { secreto, clave: new Uint8Array(digest) };
-  return claveCache.clave;
+export interface NuevaSesion {
+  identidad: Identidad;
+  clienteElegidoId: number | null;
+  inicio?: number;
 }
 
-export async function cifrarSesion(sesion: Sesion): Promise<string> {
-  return new EncryptJWT({ ...sesion })
-    .setProtectedHeader({ alg: "dir", enc: "A256GCM" })
-    .setIssuedAt()
-    .setExpirationTime(`${DURACION_SEGUNDOS}s`)
-    .encrypt(await clave());
+export const opcionesCookieSesion = {
+  httpOnly: true,
+  secure: true,
+  sameSite: "lax",
+  path: "/",
+  maxAge: DURACION_SESION_SEGUNDOS,
+} as const;
+
+export async function cifrarSesion(sesion: NuevaSesion, ahora = Date.now()): Promise<string> {
+  const { identidad } = sesion;
+  const completa: Sesion = {
+    identidad: { ...identidad, appRoles: [...identidad.appRoles], grupos: [...identidad.grupos] },
+    clienteElegidoId: sesion.clienteElegidoId,
+    inicio: sesion.inicio ?? Math.floor(ahora / 1000),
+  };
+  return cifrar({ ...completa }, "sesion", DURACION_SESION_SEGUNDOS);
 }
 
-export async function descifrarSesion(token: string): Promise<Sesion | null> {
-  try {
-    const { payload } = await jwtDecrypt(token, await clave(), {
-      keyManagementAlgorithms: ["dir"],
-      contentEncryptionAlgorithms: ["A256GCM"],
-    });
-    const parsed = sesionSchema.safeParse(payload);
-    return parsed.success ? parsed.data : null;
-  } catch {
-    return null;
-  }
+/** Valida firma, vencimiento (8 h) y tope absoluto (24 h). */
+export async function descifrarSesion(token: string, ahora = Date.now()): Promise<(Sesion & { emitida: number }) | null> {
+  const payload = await descifrar(token, "sesion");
+  if (!payload) return null;
+  const parsed = sesionSchema.safeParse(payload);
+  if (!parsed.success) return null;
+  if (Math.floor(ahora / 1000) - parsed.data.inicio > MAXIMO_SESION_SEGUNDOS) return null;
+  return { ...parsed.data, emitida: payload.iat ?? 0 };
+}
+
+/** ¿Hay que reemitir la cookie (renovación deslizante)? */
+export function debeRenovar(emitida: number, ahora = Date.now()): boolean {
+  return Math.floor(ahora / 1000) - emitida > RENOVAR_CADA_SEGUNDOS;
 }
 
 export async function leerSesion(): Promise<Sesion | null> {
   const token = (await cookies()).get(COOKIE_SESION)?.value;
-  return token ? descifrarSesion(token) : null;
+  if (!token) return null;
+  const s = await descifrarSesion(token);
+  if (!s) return null;
+  const { emitida: _e, ...sesion } = s;
+  return sesion;
 }
 
 /** Solo desde route handlers o server actions. */
-export async function guardarSesion(sesion: Sesion): Promise<void> {
-  (await cookies()).set(COOKIE_SESION, await cifrarSesion(sesion), {
-    httpOnly: true,
-    secure: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: DURACION_SEGUNDOS,
-  });
+export async function guardarSesion(sesion: NuevaSesion): Promise<void> {
+  (await cookies()).set(COOKIE_SESION, await cifrarSesion(sesion), opcionesCookieSesion);
 }
 
 export async function borrarSesion(): Promise<void> {

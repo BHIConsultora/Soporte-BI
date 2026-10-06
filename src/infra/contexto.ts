@@ -2,16 +2,18 @@ import "server-only";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
-import { DEMO_BHI_TENANT_ID } from "@/repositorio/demo/constantes";
 import { getRepositorio } from "@/repositorio";
 import { resolverAcceso, type Acceso, type ContextoAutorizado, type Identidad } from "@/servicios/acceso";
 import type { ContextoBhi, ContextoCliente } from "@/servicios/autorizacion";
+import { bhiTenantIds } from "./auth/config";
+import { accesoConCache, claveAcceso } from "./cache-acceso";
 import { getEnv } from "./env";
 import { leerSesion, type Sesion } from "./sesion";
 
-export function bhiTenantId(): string {
+/** Segundos de caché del acceso: configurable, 120 por defecto y 0 en demo (cambios al instante). */
+function ttlAcceso(): number {
   const env = getEnv();
-  return env.demo ? DEMO_BHI_TENANT_ID : env.BHI_TENANT_ID;
+  return env.ACCESO_CACHE_SEGUNDOS ?? (env.demo ? 0 : 120);
 }
 
 export interface ContextoRequest {
@@ -27,11 +29,12 @@ export interface ContextoRequest {
 export const obtenerContexto = cache(async (): Promise<ContextoRequest | null> => {
   const sesion = await leerSesion();
   if (!sesion) return null;
-  const repo = await getRepositorio();
-  const acceso = await resolverAcceso(sesion.identidad, repo, {
-    bhiTenantId: bhiTenantId(),
-    clienteElegidoId: sesion.clienteElegidoId,
-  });
+  const acceso = await accesoConCache(claveAcceso(sesion.identidad, sesion.clienteElegidoId), ttlAcceso(), async () =>
+    resolverAcceso(sesion.identidad, await getRepositorio(), {
+      bhiTenantIds: bhiTenantIds(),
+      clienteElegidoId: sesion.clienteElegidoId,
+    }),
+  );
   return { sesion, identidad: sesion.identidad, acceso };
 });
 

@@ -42,7 +42,8 @@ export interface ContextoAutorizado {
 }
 
 export interface OpcionesAcceso {
-  bhiTenantId: string;
+  /** Tenant(s) de BHI. En el preview conviven el ficticio de la demo y el real. */
+  bhiTenantIds: readonly string[];
   /** Cliente elegido en la sesión (solo relevante para satélites en varios grupos). */
   clienteElegidoId?: number | null;
 }
@@ -56,11 +57,11 @@ const lower = (s: string) => s.trim().toLowerCase();
 export async function resolverAcceso(
   identidad: Identidad,
   repo: Repositorio,
-  { bhiTenantId, clienteElegidoId = null }: OpcionesAcceso,
+  { bhiTenantIds, clienteElegidoId = null }: OpcionesAcceso,
 ): Promise<Acceso> {
   let cliente: Cliente | null;
 
-  if (lower(identidad.tid) === lower(bhiTenantId)) {
+  if (bhiTenantIds.some((t) => lower(t) === lower(identidad.tid))) {
     if (identidad.esInvitado) return { tipo: "denegado", code: "sin_permiso" };
     if (identidad.appRoles.includes("Admin")) return { tipo: "bhi", rol: "admin" };
     if (identidad.appRoles.includes("Soporte")) return { tipo: "bhi", rol: "soporte" };

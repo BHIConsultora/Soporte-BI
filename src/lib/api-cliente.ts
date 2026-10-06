@@ -8,12 +8,21 @@ interface Opciones {
   form?: FormData;
 }
 
+/** Token de doble envío: la cookie `__Host-sbi_csrf` (la pone el servidor) va también en un header. */
+function tokenCsrf(): string {
+  const m = /(?:^|;\s*)__Host-sbi_csrf=([^;]+)/.exec(document.cookie);
+  return m?.[1] ? decodeURIComponent(m[1]) : "";
+}
+
 export async function llamarApi<T = unknown>(url: string, { method = "GET", json, form }: Opciones = {}): Promise<ResultadoApi<T>> {
   try {
     const res = await fetch(url, {
       method,
       credentials: "same-origin",
-      headers: json !== undefined ? { "Content-Type": "application/json" } : undefined,
+      headers: {
+        ...(json !== undefined && { "Content-Type": "application/json" }),
+        ...(method !== "GET" && { "x-csrf-token": tokenCsrf() }),
+      },
       body: form ?? (json !== undefined ? JSON.stringify(json) : undefined),
     });
     const texto = await res.text();

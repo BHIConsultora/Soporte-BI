@@ -9,7 +9,7 @@ import type { ContextoAutorizado } from "@/servicios/acceso";
 import { notificadorNulo, type Deps } from "@/servicios/deps";
 import { ErrorServicio, noEncontrado } from "@/servicios/errores";
 import { obtenerContexto } from "./contexto";
-import { origenValido } from "./csrf";
+import { mutacionValida } from "./csrf";
 import { getEnv } from "./env";
 import { errorJson, requestIdDe } from "./http";
 import { log } from "./logger";
@@ -37,8 +37,8 @@ export function rutaApi<P extends Record<string, string> = Record<string, never>
   return async (request: Request, segmento: { params: Promise<P> }): Promise<Response> => {
     const requestId = requestIdDe(request);
     try {
-      if (mutacion && !origenValido(request, getEnv().APP_URL)) {
-        return errorJson(requestId, 403, "Origen no permitido.", "sin_permiso");
+      if (mutacion && !mutacionValida(request, getEnv().APP_URL)) {
+        return errorJson(requestId, 403, "La página venció o el pedido no vino del portal. Recargala y probá de nuevo.", "csrf");
       }
       const contexto = await obtenerContexto();
       if (!contexto) return errorJson(requestId, 401, "Tenés que iniciar sesión.");

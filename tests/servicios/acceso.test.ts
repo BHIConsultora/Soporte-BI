@@ -3,7 +3,7 @@ import { CLIENTE, DEMO_BHI_TENANT_ID, DEMO_GRUPO_PATAGONIA } from "@/repositorio
 import { resolverAcceso } from "@/servicios/acceso";
 import { identidadDe, repoDemo } from "./helpers";
 
-const opciones = { bhiTenantId: DEMO_BHI_TENANT_ID };
+const opciones = { bhiTenantIds: [DEMO_BHI_TENANT_ID] };
 
 describe("resolución de acceso (§4.3)", () => {
   it.each([

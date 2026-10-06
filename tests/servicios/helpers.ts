@@ -23,7 +23,7 @@ export function identidadDe(clave: string): Identidad {
 
 export async function contextoDe(clave: string, repo: Repositorio = repoDemo()): Promise<ContextoAutorizado> {
   const identidad = identidadDe(clave);
-  const acceso = await resolverAcceso(identidad, repo, { bhiTenantId: DEMO_BHI_TENANT_ID });
+  const acceso = await resolverAcceso(identidad, repo, { bhiTenantIds: [DEMO_BHI_TENANT_ID] });
   if (acceso.tipo !== "bhi" && acceso.tipo !== "cliente") throw new Error(`${clave} no tiene acceso: ${acceso.tipo}`);
   return { identidad, acceso };
 }
