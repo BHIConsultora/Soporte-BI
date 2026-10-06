@@ -2,7 +2,7 @@
 
 > **Fuente de verdad del diseño.** Si algo del código contradice este documento, gana este documento (o se actualiza acá con una decisión en `DECISIONES.md`).
 > BHI Consultora Regional · Responsable: Martín Lasserre (mlasserre@bhiconsultora.com.ar)
-> Última actualización: 2026-10-06 (cierre de la etapa 0).
+> Última actualización: 2026-10-06 (cierre de la etapa 1).
 
 ## 1. Qué resuelve
 
@@ -30,8 +30,8 @@ Sistema de gestión de reclamos sobre los tableros de Power BI que BHI mantiene 
 | Capa | Elección | Estado |
 |---|---|---|
 | Framework | Next.js 16 (App Router), React 19, TypeScript 6 `strict` | ✅ etapa 0 |
-| UI | Tailwind CSS v4, shadcn/ui (paquete `radix-ui`), lucide-react, sonner | ✅ base (sonner en etapa 1) |
-| Formularios / validación | react-hook-form + zod 4 (mismos esquemas en cliente y servidor) | etapa 1 |
+| UI | Tailwind CSS v4, shadcn/ui (paquete `radix-ui`), lucide-react; modales con `<dialog>` nativo (sin sonner, ADR-012); kanban con `@dnd-kit/core` | ✅ |
+| Formularios / validación | react-hook-form + zod 4 (mismos esquemas en cliente y servidor, `dominio/esquemas.ts`) | ✅ |
 | Auth | `@azure/msal-node` (auth code + PKCE) con `clientAssertion` = token OIDC de Vercel; sesión en cookie cifrada con `jose` (JWE `dir` + `A256GCM`) | sesión ✅ · MSAL etapa 2 |
 | Graph | `fetch` propio tipado, caché de token de app, reintentos con backoff ante 429/503 con `Retry-After`, paginación `@odata.nextLink` | etapa 3 |
 | MCP | `mcp-handler` o `@modelcontextprotocol/sdk` sobre un route handler, Streamable HTTP | etapa 5 |
@@ -158,7 +158,7 @@ Filtros (siempre aplicados por `servicios/tickets.ts → filtroPorRol`):
 | Prioridad inicial | Crítica→P1, Alta→P2, Media→P3, Baja→P4 (luego la ajusta Claude o soporte) |
 | Categoría (Claude/soporte) | mismos valores que Tipo |
 
-**SLA**: horario hábil lun–vie 9–18 h `America/Argentina/Buenos_Aires`, excluyendo "Feriados BI". `VenceSLA` se recalcula al cambiar la prioridad. Semáforo: verde > 50 % restante, amarillo ≤ 50 %, rojo vencido. Función pura con tests exhaustivos. (etapa 4)
+**SLA**: horario hábil lun–vie 9–18 h `America/Argentina/Buenos_Aires`, excluyendo "Feriados BI". `VenceSLA` se recalcula al cambiar la prioridad. Semáforo: verde > 50 % restante, amarillo ≤ 50 %, rojo vencido. Función pura con tests (`dominio/sla.ts`, ADR-013: se recalcula desde el alta). ✅
 
 ## 7. Entrada desde Power BI
 
@@ -201,8 +201,8 @@ Errores: `{ error: string, code?: string, requestId }`; códigos `401`, `403 { c
 |---|---|---|
 | Sesión | Cookie `__Host-sbi_sesion`, `httpOnly`, `Secure`, `SameSite=Lax`, JWE; expira a las 8 h; renovación deslizante; logout borra la cookie | ✅ (deslizante: etapa 2) |
 | CSRF | Mutaciones solo `POST/PATCH/DELETE` con verificación de `Origin` + token de doble envío | Origin ✅ · token etapa 2 |
-| Validación | zod en cada handler; longitudes máximas; enums | en curso |
-| Adjuntos | Máx. 3 por mensaje, 4 MB c/u, 10 MB por request. PNG, JPEG, WebP, PDF, XLSX, CSV. Verificación por **magic bytes** (CSV: UTF-8 válido sin nulos; XLSX: ZIP con `[Content_Types].xml` y **sin** `vbaProject.bin`). Rechazar SVG, XLSM, ejecutables. Nombre UUID | etapa 1/3 |
+| Validación | zod en cada handler; longitudes máximas; enums | ✅ |
+| Adjuntos | Máx. 3 por mensaje, 4 MB c/u, 10 MB por request. PNG, JPEG, WebP, PDF, XLSX, CSV. Verificación por **magic bytes** (CSV: UTF-8 válido sin nulos; XLSX: ZIP con `[Content_Types].xml` y **sin** `vbaProject.bin`). Rechazar SVG, XLSM, ejecutables. Nombre UUID | ✅ validación · ⚠️ límite de ~4,5 MB por request en Vercel (§18) |
 | Rate limit | Por `oid` en creación de tickets y comentarios (ventana deslizante; documentar la limitación sin estado; Vercel Firewall cuando el plan lo permita) | etapa 6 |
 | Headers | CSP con nonce (`default-src 'self'`; `connect-src 'self'`; `frame-ancestors 'none'`; `form-action` con `login.microsoftonline.com`), HSTS, `nosniff`, `Referrer-Policy`, `Permissions-Policy` | ✅ |
 | Logs | Sin tokens, sin contenido de tickets, sin emails completos; `requestId` en cada log | ✅ base (`src/infra/logger.ts`) |
@@ -214,17 +214,17 @@ Errores: `{ error: string, code?: string, requestId }`; códigos `401`, `403 { c
 
 Cliente:
 1. **/bienvenida** ✅: "Iniciar sesión con Microsoft" (redirige si ya hay sesión).
-2. **/nuevo**: tablero precargado (chip) o selector; página; tipo (chips); descripción (mín. 20, ayuda contextual); urgencia (segmentado con explicación); adjuntos (arrastrar, pegar Ctrl+V, vista previa); **autoguardado local del borrador**; confirmación con número de ticket.
-3. **/** "Mis reclamos" (base ✅): selector `Míos / <cada área que lidera> / De mi organización` según rol; tarjetas resumen (abiertos, esperando tu respuesta, resueltos del mes) que **no** cambian con el filtro; búsqueda; filtros por estado; tabla en escritorio, tarjetas en mobile.
-4. **/tickets/[id]**: datos, línea de tiempo tipo chat (sin internos), responder con adjuntos, "Se resolvió", "Reabrir".
-5. **/no-habilitado** ✅, **/elegir-cliente** ✅, **/consentimiento**, 404 ✅ y error ✅ amigables.
+2. **/nuevo** ✅: tablero precargado (chip) o selector; página; tipo (chips); descripción (mín. 20, ayuda contextual); urgencia (segmentado con explicación); adjuntos (arrastrar, pegar Ctrl+V, vista previa); **autoguardado local del borrador**; confirmación con número de ticket.
+3. **/** "Mis reclamos" ✅: selector `Míos / <cada área que lidera> / De mi organización` según rol; tarjetas resumen (abiertos, esperando tu respuesta, resueltos del mes) que **no** cambian con el filtro; búsqueda; filtros por estado; tabla en escritorio, tarjetas en mobile.
+4. **/tickets/[id]** ✅: datos, línea de tiempo tipo chat (sin internos), responder con adjuntos, "Se resolvió", "Reabrir".
+5. **/no-habilitado** ✅, **/elegir-cliente** ✅, **/consentimiento** ✅, 404 ✅ y error ✅ amigables.
 
 Soporte:
-6. **/soporte**: **kanban** por estado (Nuevo, En análisis, Esperando al cliente, Resuelto) con tarjetas: ID, cliente, tablero, prioridad, semáforo SLA, asignado, ícono de borrador pendiente. Filtros: cliente, prioridad, "míos", "sin asignar", "con borrador pendiente". Cambiar estado arrastrando (con teclado accesible) o desde el detalle. Botón "Tomar".
-7. **/soporte/tickets/[id]**: historial con internos; bloque **"Claude · IA · Interno"** visualmente distinto; borrador editable con "Publicar" (confirmación "Esto lo va a ver el cliente"), "Descartar"; nota interna; estado, prioridad, asignado; contexto del botón de Power BI.
+6. **/soporte** ✅: **kanban** por estado (Nuevo, En análisis, Esperando al cliente, Resuelto) con tarjetas: ID, cliente, tablero, prioridad, semáforo SLA, asignado, ícono de borrador pendiente. Filtros: cliente, prioridad, "míos", "sin asignar", "con borrador pendiente". Cambiar estado arrastrando (con teclado accesible) o desde el detalle. Botón "Tomar".
+7. **/soporte/tickets/[id]** ✅: historial con internos; bloque **"Claude · IA · Interno"** visualmente distinto; borrador editable con "Publicar" (confirmación "Esto lo va a ver el cliente"), "Descartar"; nota interna; estado, prioridad, asignado; contexto del botón de Power BI.
 
 Admin:
-8. **/admin**: clientes (alta por dominio → TenantId vía `/.well-known/openid-configuration`; satélite → GrupoId), áreas y líderes, tableros (multi-área) con generador de medida DAX, solicitudes de acceso, feriados, link de consentimiento copiable.
+8. **/admin** ✅: clientes (alta por dominio → TenantId vía `/.well-known/openid-configuration`; satélite → GrupoId), áreas y líderes, tableros (multi-área) con generador de medida DAX, solicitudes de acceso, feriados, link de consentimiento copiable.
 
 En modo demo: selector flotante de persona ✅ (11 personas: usuario, otra usuaria, líder, referente, usuaria de otro cliente, satélite, satélite multi-cliente, soporte, admin, invitado B2B, tenant no habilitado).
 
@@ -262,9 +262,9 @@ Triage automático por API de Anthropic preparado y **desactivado**: si existe `
 
 ## 14. Testing (bloqueante en CI)
 
-- Matriz de autorización (Vitest) rol × endpoint × recurso propio/ajeno/otra área/otro cliente/satélite. ✅ base: acceso y listado.
-- SLA, adjuntos, escapado OData, herramientas MCP: en sus etapas.
-- Playwright en modo demo (escritorio + mobile 375 px, axe sin violaciones serias). ✅ base.
+- Matriz de autorización (Vitest) rol × operación × recurso propio/ajeno/otra área/tablero compartido/otro cliente/satélite. ✅
+- SLA ✅, adjuntos ✅, DAX ✅; escapado OData y herramientas MCP en sus etapas.
+- Playwright en modo demo: recorridos de usuario, líder, referente, soporte y admin, escritorio + mobile 375 px, axe sin violaciones serias, Escape cierra modales. ✅
 
 ## 15. Variables de entorno
 
@@ -277,7 +277,7 @@ En modo demo solo se usa `DEMO_MODE`; `SESSION_SECRET` es opcional (si falta se 
 | Etapa | Entrega | Hecho cuando | Estado |
 |---|---|---|---|
 | 0. Base | Limpieza de Lovable, Next.js + bun, identidad visual, layout, modo demo, CI, `docs/` | CI verde; deploy en Vercel preview en modo demo | ✅ aprobada 2026-10-06 (preview desde la rama `demo`) |
-| 1. UI completa en demo | Todas las pantallas de §10 contra `DemoRepo`, kanban, admin | Recorridos de Playwright de los 5 roles | |
+| 1. UI completa en demo | Todas las pantallas de §10 contra `DemoRepo`, kanban, admin | Recorridos de Playwright de los 5 roles | ✅ código · a aprobar en el preview |
 | 2. Auth real | MSAL Node + federación Vercel, sesión, rol (tenant, satélite, BHI), consentimiento, solicitudes | Matriz de autorización verde; guía de Entra en `DEPLOY.md` | |
 | 3. SharePoint | `SharePointRepo`, adjuntos, `provision.ts` + workflow | Contrato del repo contra mock de Graph; dry run documentado | |
 | 4. Notificaciones y cron | Correo, Teams, cierre automático, SLA | Tests de plantillas y del cron | |
@@ -292,3 +292,5 @@ Multicanal (WhatsApp/Copilot Studio), Dataverse, otros idiomas, migración de ti
 
 1. ¿Algún cliente satélite usa cuentas invitadas (B2B)? (antes de la etapa 2)
 2. App roles y grupos: hoy se toman del ID token al iniciar sesión y viven en la sesión (≤ 8 h). Si se quiere que una baja de rol de soporte impacte antes, hace falta consultar Graph (`appRoleAssignments`) con caché corta. A decidir en la etapa 2.
+3. **Tamaño de adjuntos vs. Vercel:** una función de Vercel acepta como máximo ~4,5 MB por request y el diseño permite 10 MB por mensaje. Propuesta: subir cada adjunto en su propio request (≤ 4 MB) antes de mandar el mensaje. A decidir antes de la etapa 3.
+4. **SLA:** ¿"24 h / 72 h hábiles" son horas hábiles literales (implementado) o 1 / 3 días hábiles? (ADR-013)

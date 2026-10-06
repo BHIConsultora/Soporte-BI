@@ -77,3 +77,50 @@ Formato: contexto → decisión → consecuencias. Las decisiones se agregan, no
 - **Contexto:** en Vercel no aparece la opción para cambiar la *Production Branch*, así que ADR-010 no se puede aplicar. `main` es la rama de producción de Vercel.
 - **Decisión:** todo el desarrollo pasa a la rama `demo`. Vercel la despliega como **Preview**, donde se lee `DEMO_MODE=true`. `main` queda congelada en el cierre de la etapa 0 y solo se actualiza cuando haya auth real y se decida pasar a producción. El CI corre en `main` y en `demo`. Se mantienen las reglas: commits chicos, nada de reescribir historia, checks en verde antes de cada push.
 - **Consecuencias:** el deploy de producción de `main` no tiene `DEMO_MODE` ni credenciales: hasta la etapa 2 responde con error al entrar (es esperable; no usarlo). Para pasar a producción se hace un merge de `demo` a `main` (sin *force push*).
+
+## ADR-012 · Sin sonner ni Radix Dialog: `<dialog>` nativo y avisos en línea
+**Fecha:** 2026-10-06 · **Estado:** aceptada
+
+- **Contexto:** sonner y Radix Dialog (vía `react-remove-scroll`) insertan `<style>` en runtime sin nonce; la CSP de producción los bloquea (ADR-005).
+- **Decisión:** modales con `<dialog>` nativo (`showModal()`: foco atrapado, fondo inerte y Escape cierran sin código extra) en `components/ui/dialogo.tsx`. Los resultados de acciones se anuncian con mensajes en línea (`role="status"` / `role="alert"`). Se quitó `sonner`.
+- **Consecuencias:** cero violaciones de CSP en consola. Si más adelante se quiere un "toast", se hace propio con la misma técnica.
+
+## ADR-013 · Cálculo del SLA
+**Fecha:** 2026-10-06 · **Estado:** aceptada (a confirmar con Martín)
+
+- **Decisión:** horario hábil lun–vie 9–18 h (9 h por día) en Buenos Aires, sin los días de "Feriados BI".
+  - P1: fin del día hábil en que entra (si entra fuera de horario, fin del siguiente día hábil).
+  - P2 / P3: 24 / 72 **horas hábiles** literales (P2 ≈ 2,7 días hábiles; P3 = 8 días hábiles).
+  - P4: sin vencimiento.
+  - El vencimiento se recalcula **desde la fecha de alta** al cambiar la prioridad.
+  - Semáforo por minutos hábiles: verde > 50 % restante, amarillo ≤ 50 %, rojo vencido. Solo para tickets abiertos.
+- **Consecuencias:** si se prefiere "24 h hábiles = 1 día hábil" y "72 h = 3 días hábiles", es cambiar `HORAS_HABILES` en `dominio/sla.ts` y sus tests.
+
+## ADR-014 · Reglas de ciclo de vida
+**Fecha:** 2026-10-06 · **Estado:** aceptada
+
+- Si el autor responde con el ticket en "Esperando al cliente", vuelve solo a "En análisis".
+- Un ticket "Cerrado" no admite comentarios (409): se pide crear uno nuevo.
+- Publicar un borrador crea un comentario visible **a nombre de la persona de soporte que publica** (no de Claude) y marca el borrador como `publicado` con el texto final.
+- Los cambios de estado los ve el cliente; prioridad y asignación son internos.
+- Las tarjetas de "Mis reclamos" (abiertos, esperando tu respuesta, resueltos del mes) se calculan siempre sobre los tickets **propios**, aunque el rol vea más.
+
+## ADR-015 · Adjuntos
+**Fecha:** 2026-10-06 · **Estado:** aceptada
+
+- Los adjuntos del alta quedan en la entrada inicial del historial; los de cada respuesta, en su comentario.
+- Un cliente solo puede bajar adjuntos de entradas que ve; soporte, todos los del ticket. La descarga es siempre por `/api/adjuntos/:id` con `attachment`, `nosniff` y `sandbox`.
+- El contenido se valida antes de crear el ticket, para no dejar tickets a medias.
+
+## ADR-016 · Repositorio demo compartido y e2e en serie
+**Fecha:** 2026-10-06 · **Estado:** aceptada
+
+- **Contexto:** Next empaqueta páginas y route handlers por separado; un singleton de módulo daba dos copias de los datos demo (un ticket creado por la API no aparecía en el kanban).
+- **Decisión:** la instancia del `DemoRepo` vive en `globalThis`. Los e2e corren con 1 worker y cada test reinicia la demo con `POST /api/demo/reiniciar` (solo existe en modo demo).
+- **Consecuencias:** en Vercel cada instancia serverless tiene su propia memoria: en el preview los cambios pueden "desaparecer" si el pedido cae en otra instancia o la instancia se recicla. Es esperable en la demo.
+
+## ADR-017 · Kanban accesible
+**Fecha:** 2026-10-06 · **Estado:** aceptada
+
+- `@dnd-kit/core` con un **botón asa** por tarjeta ("Mover TCK-0001"), separado del link y del botón "Tomar" (evita elementos interactivos anidados). Con teclado: Espacio agarra, ← / → saltan de columna, Espacio suelta, Escape cancela; anuncios en castellano.
+- En mobile las columnas son un carrusel horizontal; el cambio de estado accesible es desde el detalle del ticket.
