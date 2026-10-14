@@ -4,6 +4,8 @@ import type {
   Cliente,
   EntradaHistorial,
   Feriado,
+  MiembroSatelite,
+  PersonalBhi,
   SolicitudAcceso,
   Tablero,
   Ticket,
@@ -16,8 +18,6 @@ import type {
 
 import {
   DEMO_BHI_TENANT_ID,
-  DEMO_GRUPO_PATAGONIA,
-  DEMO_GRUPO_PILOTO,
   DEMO_TENANT_ANDINA,
   DEMO_TENANT_LITORAL,
   DEMO_TENANT_NO_HABILITADO,
@@ -28,7 +28,7 @@ export * from "./constantes";
 export const CLIENTE = { piloto: 1, andina: 2, litoral: 3, patagonia: 4 } as const;
 export const AREA = { comercial: 10, finanzas: 11, logistica: 12, produccion: 20, operaciones: 30 } as const;
 
-/** Personas de la demo: identidad tal como llegaría en el ID token de Entra. */
+/** Personas de la demo: identidad tal como llega del login de Microsoft (tenant + email). */
 export interface IdentidadDemo {
   clave: string;
   descripcion: string;
@@ -36,25 +36,22 @@ export interface IdentidadDemo {
   tid: string;
   email: string;
   nombre: string;
-  appRoles: string[];
-  grupos: string[];
-  esInvitado: boolean;
 }
 
 const oid = (n: number) => `00000000-0000-4000-9000-${String(n).padStart(12, "0")}`;
 
 export const PERSONAS_DEMO: IdentidadDemo[] = [
-  { clave: "usuario", descripcion: "Usuario · Distribuidora Andina", oid: oid(1), tid: DEMO_TENANT_ANDINA, email: "ulises.usuario@andina.example.com", nombre: "Ulises Usuario", appRoles: [], grupos: [], esInvitado: false },
-  { clave: "usuario2", descripcion: "Otra usuaria · Distribuidora Andina", oid: oid(2), tid: DEMO_TENANT_ANDINA, email: "paula.perez@andina.example.com", nombre: "Paula Pérez", appRoles: [], grupos: [], esInvitado: false },
-  { clave: "lider", descripcion: "Líder de Comercial · Distribuidora Andina", oid: oid(3), tid: DEMO_TENANT_ANDINA, email: "lucia.lider@andina.example.com", nombre: "Lucía Líder", appRoles: [], grupos: [], esInvitado: false },
-  { clave: "referente", descripcion: "Referente general · Distribuidora Andina", oid: oid(4), tid: DEMO_TENANT_ANDINA, email: "ramiro.referente@andina.example.com", nombre: "Ramiro Referente", appRoles: [], grupos: [], esInvitado: false },
-  { clave: "litoral", descripcion: "Usuaria · Cooperativa del Litoral", oid: oid(5), tid: DEMO_TENANT_LITORAL, email: "camila.coop@litoral.example.com", nombre: "Camila Cooperativa", appRoles: [], grupos: [], esInvitado: false },
-  { clave: "satelite", descripcion: "Usuario satélite · Estudio Patagonia", oid: oid(6), tid: DEMO_BHI_TENANT_ID, email: "santiago.patagonia@bhi.example.com", nombre: "Santiago Satélite", appRoles: [], grupos: [DEMO_GRUPO_PATAGONIA], esInvitado: false },
-  { clave: "satelite-multi", descripcion: "Satélite en dos clientes (elige cliente)", oid: oid(7), tid: DEMO_BHI_TENANT_ID, email: "mara.multi@bhi.example.com", nombre: "Mara Multi", appRoles: [], grupos: [DEMO_GRUPO_PATAGONIA, DEMO_GRUPO_PILOTO], esInvitado: false },
-  { clave: "soporte", descripcion: "Soporte · BHI", oid: oid(8), tid: DEMO_BHI_TENANT_ID, email: "sofia.soporte@bhi.example.com", nombre: "Sofía Soporte", appRoles: ["Soporte"], grupos: [], esInvitado: false },
-  { clave: "admin", descripcion: "Admin · BHI", oid: oid(9), tid: DEMO_BHI_TENANT_ID, email: "martina.admin@bhi.example.com", nombre: "Martina Admin", appRoles: ["Admin"], grupos: [], esInvitado: false },
-  { clave: "invitado", descripcion: "Invitado B2B en BHI (sin acceso)", oid: oid(10), tid: DEMO_BHI_TENANT_ID, email: "invitado@externo.example.com", nombre: "Iván Invitado", appRoles: ["Soporte"], grupos: [], esInvitado: true },
-  { clave: "no-habilitado", descripcion: "Tenant no habilitado", oid: oid(11), tid: DEMO_TENANT_NO_HABILITADO, email: "nadia@otra.example.com", nombre: "Nadia Nueva", appRoles: [], grupos: [], esInvitado: false },
+  { clave: "usuario", descripcion: "Usuario · Distribuidora Andina", oid: oid(1), tid: DEMO_TENANT_ANDINA, email: "ulises.usuario@andina.example.com", nombre: "Ulises Usuario" },
+  { clave: "usuario2", descripcion: "Otra usuaria · Distribuidora Andina", oid: oid(2), tid: DEMO_TENANT_ANDINA, email: "paula.perez@andina.example.com", nombre: "Paula Pérez" },
+  { clave: "lider", descripcion: "Líder de Comercial · Distribuidora Andina", oid: oid(3), tid: DEMO_TENANT_ANDINA, email: "lucia.lider@andina.example.com", nombre: "Lucía Líder" },
+  { clave: "referente", descripcion: "Referente general · Distribuidora Andina", oid: oid(4), tid: DEMO_TENANT_ANDINA, email: "ramiro.referente@andina.example.com", nombre: "Ramiro Referente" },
+  { clave: "litoral", descripcion: "Usuaria · Cooperativa del Litoral", oid: oid(5), tid: DEMO_TENANT_LITORAL, email: "camila.coop@litoral.example.com", nombre: "Camila Cooperativa" },
+  { clave: "satelite", descripcion: "Usuario satélite · Estudio Patagonia", oid: oid(6), tid: DEMO_BHI_TENANT_ID, email: "santiago.patagonia@bhi.example.com", nombre: "Santiago Satélite" },
+  { clave: "satelite-multi", descripcion: "Satélite en dos clientes (elige cliente)", oid: oid(7), tid: DEMO_BHI_TENANT_ID, email: "mara.multi@bhi.example.com", nombre: "Mara Multi" },
+  { clave: "soporte", descripcion: "Soporte · BHI", oid: oid(8), tid: DEMO_BHI_TENANT_ID, email: "sofia.soporte@bhi.example.com", nombre: "Sofía Soporte" },
+  { clave: "admin", descripcion: "Admin · BHI", oid: oid(9), tid: DEMO_BHI_TENANT_ID, email: "martina.admin@bhi.example.com", nombre: "Martina Admin" },
+  { clave: "invitado", descripcion: "Invitado B2B en BHI (sin acceso)", oid: oid(10), tid: DEMO_BHI_TENANT_ID, email: "invitado@externo.example.com", nombre: "Iván Invitado" },
+  { clave: "no-habilitado", descripcion: "Tenant no habilitado", oid: oid(11), tid: DEMO_TENANT_NO_HABILITADO, email: "nadia@otra.example.com", nombre: "Nadia Nueva" },
 ];
 
 export function persona(clave: string): IdentidadDemo {
@@ -71,6 +68,8 @@ export interface DatosDemo {
   historial: EntradaHistorial[];
   feriados: Feriado[];
   solicitudes: SolicitudAcceso[];
+  personalBhi: PersonalBhi[];
+  miembros: MiembroSatelite[];
 }
 
 export function crearDatosDemo(ahora: Date = new Date()): DatosDemo {
@@ -79,10 +78,10 @@ export function crearDatosDemo(ahora: Date = new Date()): DatosDemo {
   const en = (horas: number) => new Date(ahora.getTime() + horas * 3_600_000).toISOString();
 
   const clientes: Cliente[] = [
-    { id: CLIENTE.piloto, nombre: "BHI Consultora (piloto)", tipo: "satelite", tenantId: null, grupoId: DEMO_GRUPO_PILOTO, dominio: "bhi.example.com", activo: true, referentesGenerales: [], notasContexto: "Piloto interno para probar el circuito completo." },
-    { id: CLIENTE.andina, nombre: "Distribuidora Andina", tipo: "tenant", tenantId: DEMO_TENANT_ANDINA, grupoId: null, dominio: "andina.example.com", activo: true, referentesGenerales: ["ramiro.referente@andina.example.com"], notasContexto: "Distribuidora de consumo masivo. Los tableros se actualizan a las 7 h desde el ERP. Cierre contable el día 5." },
-    { id: CLIENTE.litoral, nombre: "Cooperativa del Litoral", tipo: "tenant", tenantId: DEMO_TENANT_LITORAL, grupoId: null, dominio: "litoral.example.com", activo: true, referentesGenerales: [], notasContexto: "Cooperativa agrícola. Gateway on-premise que a veces se cae los lunes." },
-    { id: CLIENTE.patagonia, nombre: "Estudio Patagonia", tipo: "satelite", tenantId: null, grupoId: DEMO_GRUPO_PATAGONIA, dominio: "patagonia.example.com", activo: true, referentesGenerales: [], notasContexto: "Cliente satélite: sus usuarios son cuentas del tenant de BHI." },
+    { id: CLIENTE.piloto, nombre: "BHI Consultora (piloto)", tipo: "satelite", tenantId: null, dominio: "bhi.example.com", activo: true, referentesGenerales: [], notasContexto: "Piloto interno para probar el circuito completo." },
+    { id: CLIENTE.andina, nombre: "Distribuidora Andina", tipo: "tenant", tenantId: DEMO_TENANT_ANDINA, dominio: "andina.example.com", activo: true, referentesGenerales: ["ramiro.referente@andina.example.com"], notasContexto: "Distribuidora de consumo masivo. Los tableros se actualizan a las 7 h desde el ERP. Cierre contable el día 5." },
+    { id: CLIENTE.litoral, nombre: "Cooperativa del Litoral", tipo: "tenant", tenantId: DEMO_TENANT_LITORAL, dominio: "litoral.example.com", activo: true, referentesGenerales: [], notasContexto: "Cooperativa agrícola. Gateway on-premise que a veces se cae los lunes." },
+    { id: CLIENTE.patagonia, nombre: "Estudio Patagonia", tipo: "satelite", tenantId: null, dominio: "patagonia.example.com", activo: true, referentesGenerales: [], notasContexto: "Cliente satélite: sus usuarios son cuentas del tenant de BHI." },
   ];
 
   const areas: Area[] = [
@@ -198,5 +197,17 @@ export function crearDatosDemo(ahora: Date = new Date()): DatosDemo {
     { id: 1, tenantId: DEMO_TENANT_NO_HABILITADO, dominio: "otra.example.com", email: "nadia@otra.example.com", nombre: "Nadia Nueva", fecha: hace(2), estado: "pendiente" },
   ];
 
-  return { clientes, areas, tableros, tickets, historial, feriados, solicitudes };
+  // Reemplazan a los app roles y grupos de Entra: se administran como datos (ADR-012).
+  const personalBhi: PersonalBhi[] = [
+    { email: sofia.email, rol: "soporte", activo: true },
+    { email: persona("admin").email, rol: "admin", activo: true },
+  ];
+
+  const miembros: MiembroSatelite[] = [
+    { clienteId: CLIENTE.patagonia, email: santiago.email },
+    { clienteId: CLIENTE.patagonia, email: mara.email },
+    { clienteId: CLIENTE.piloto, email: mara.email },
+  ];
+
+  return { clientes, areas, tableros, tickets, historial, feriados, solicitudes, personalBhi, miembros };
 }

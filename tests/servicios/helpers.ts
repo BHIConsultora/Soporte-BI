@@ -1,6 +1,6 @@
 import { crearDemoRepo } from "@/repositorio/demo";
 import { DEMO_BHI_TENANT_ID, crearDatosDemo, persona } from "@/repositorio/demo/datos";
-import { resolverAcceso, type Identidad } from "@/servicios/acceso";
+import { resolverAcceso, type IdentidadEntra } from "@/servicios/acceso";
 import type { ContextoAutorizado } from "@/servicios/tickets";
 
 export const AHORA = new Date("2026-10-06T15:00:00Z");
@@ -9,7 +9,7 @@ export function repoDemo() {
   return crearDemoRepo(crearDatosDemo(AHORA));
 }
 
-export function identidadDe(clave: string): Identidad {
+export function identidadDe(clave: string): IdentidadEntra {
   const { clave: _c, descripcion: _d, ...identidad } = persona(clave);
   return identidad;
 }

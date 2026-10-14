@@ -4,6 +4,8 @@
 > BHI Consultora Regional · Responsable: Martín Lasserre (mlasserre@bhiconsultora.com.ar)
 > Última actualización: 2026-10-06 (cierre de la etapa 0).
 
+> **Cambio de plataforma (2026-10-14, ADR-011 a ADR-014):** el portal pasó a **Vite + React Router** y a **Supabase (Lovable Cloud)** para desplegarse en Lovable. La persistencia es Postgres (`supabase/migrations/`), la autorización es RLS + `acceso_actual()`, el login es el proveedor `azure` de Supabase Auth, y el personal de BHI y los miembros satélite se cargan como datos (`personal_bhi`, `cliente_miembro`) en vez de app roles y grupos de Entra. Lo que este documento dice sobre Next.js, BFF, SharePoint/Graph, Vercel y la sesión JWE (§2, §3, §4.1–4.3, §6, §8, §9, §13, §15 y §16) describe la versión anterior: ante una contradicción mandan los ADR y `docs/DEPLOY.md`. Las reglas de negocio (§4.3 y §5) no cambiaron.
+
 ## 1. Qué resuelve
 
 Sistema de gestión de reclamos sobre los tableros de Power BI que BHI mantiene para sus clientes.

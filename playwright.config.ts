@@ -3,7 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 const PORT = 3100;
 const isCI = !!process.env.CI;
 
-/** E2E siempre en modo demo. En CI se usa el build ya generado (`next start`). */
+/** E2E siempre en modo demo, contra el build de producción (`vite preview`), que es el que trae la CSP. */
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
@@ -21,10 +21,10 @@ export default defineConfig({
     { name: "mobile", use: { ...devices["Desktop Chrome"], viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true } },
   ],
   webServer: {
-    command: isCI ? `bun run start --port ${PORT}` : `bun run dev --port ${PORT}`,
+    command: `bun run build && bun run preview --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}/bienvenida`,
     reuseExistingServer: !isCI,
     timeout: 120_000,
-    env: { DEMO_MODE: "true", APP_URL: `http://localhost:${PORT}`, NEXT_TELEMETRY_DISABLED: "1" },
+    env: { VITE_DEMO_MODE: "true" },
   },
 });

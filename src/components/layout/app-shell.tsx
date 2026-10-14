@@ -1,6 +1,6 @@
 import { LogOut } from "lucide-react";
-import Link from "next/link";
 import type { ReactNode } from "react";
+import { Link } from "react-router";
 import { DemoSwitcher } from "@/components/demo/demo-switcher";
 import { Button } from "@/components/ui/button";
 import type { Acceso, Identidad } from "@/servicios/acceso";
@@ -31,7 +31,7 @@ export function AppShell({ identidad, acceso, demo, children }: Props) {
       </a>
       <header className="bg-main text-on-main">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-          <Link href="/" className="flex items-center gap-3 rounded-lg">
+          <Link to="/" className="flex items-center gap-3 rounded-lg">
             <LogoShort className="sm:hidden" />
             <LogoLong className="hidden sm:inline-flex" />
             <span className="border-l border-on-main/30 pl-3 font-display text-lg">Soporte BI</span>
@@ -44,11 +44,11 @@ export function AppShell({ identidad, acceso, demo, children }: Props) {
               </p>
             </div>
             <Button asChild variant="onMain" size="sm">
-              <a href="/api/auth/logout">
+              <Link to="/auth/logout">
                 <LogOut aria-hidden />
                 <span className="hidden sm:inline">Cerrar sesión</span>
                 <span className="sr-only sm:hidden">Cerrar sesión</span>
-              </a>
+              </Link>
             </Button>
           </div>
         </div>
@@ -57,7 +57,7 @@ export function AppShell({ identidad, acceso, demo, children }: Props) {
         {children}
       </main>
       <Footer />
-      {demo && <DemoSwitcher oidActual={identidad.oid} volver={demo.volver} />}
+      {demo && <DemoSwitcher volver={demo.volver} />}
     </div>
   );
 }

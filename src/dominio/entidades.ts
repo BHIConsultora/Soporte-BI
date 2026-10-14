@@ -4,6 +4,7 @@ import type {
   EstadoBorrador,
   EstadoSolicitud,
   Prioridad,
+  RolBhi,
   TipoCliente,
   TipoHistorial,
   TipoTicket,
@@ -11,7 +12,8 @@ import type {
 } from "./catalogos";
 
 /**
- * Entidades tal como las guarda el repositorio (SharePoint o demo).
+ * Entidades tal como las guarda el repositorio (Supabase o demo).
+ * Tablas equivalentes: `supabase/migrations/`.
  * Nunca se serializan directo hacia el navegador: los servicios las mapean a DTOs.
  * Fechas en ISO 8601 (UTC).
  */
@@ -20,8 +22,8 @@ export interface Cliente {
   id: number;
   nombre: string;
   tipo: TipoCliente;
+  /** Solo clientes `tenant`. Los `satelite` usan cuentas del tenant de BHI (ver `MiembroSatelite`). */
   tenantId: string | null;
-  grupoId: string | null;
   dominio: string | null;
   activo: boolean;
   /** Emails en minúsculas. */
@@ -49,7 +51,7 @@ export interface Tablero {
 }
 
 export interface Ticket {
-  /** ID numérico del ítem de SharePoint. El ID visible se deriva (`TCK-0042`). */
+  /** ID numérico (`ticket.id`). El ID visible se deriva (`TCK-0042`). */
   itemId: number;
   clienteId: number;
   tableroId: string;
@@ -64,6 +66,7 @@ export interface Ticket {
   categoria: Categoria | null;
   resumenIA: string | null;
   procesadoIA: boolean;
+  /** Identificador estable del autor (en Supabase, `auth.users.id`). */
   autorOid: string;
   autorNombre: string;
   autorEmail: string;
@@ -110,4 +113,19 @@ export interface Feriado {
   /** `yyyy-MM-dd` en hora de Buenos Aires. */
   fecha: string;
   descripcion: string;
+}
+
+/** Personal de BHI con acceso de soporte. Solo cuenta para logins del tenant de BHI. */
+export interface PersonalBhi {
+  /** En minúsculas. */
+  email: string;
+  rol: RolBhi;
+  activo: boolean;
+}
+
+/** Cuenta del tenant de BHI que trabaja para un cliente satélite. */
+export interface MiembroSatelite {
+  clienteId: number;
+  /** En minúsculas. */
+  email: string;
 }

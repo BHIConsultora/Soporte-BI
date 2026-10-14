@@ -4,6 +4,28 @@ Una entrada al terminar cada tarea: fecha, qué se hizo, decisiones y pendientes
 
 ---
 
+## 2026-10-14 · Migración a Lovable (Vite + Supabase)
+
+**Qué se hizo**
+
+- Se reemplazó Next.js por Vite 8 + React Router 8 (SPA), sin cambios visuales. Se comparó con Playwright pantalla por pantalla (escritorio y mobile, 11 escenas) contra la versión anterior: mismas dimensiones; solo difieren el indicador de desarrollo de Next y píxeles sueltos de antialiasing.
+- Modelo de datos en `supabase/migrations/20261014000000_modelo_inicial.sql`: tablas alineadas con `src/dominio/`, RLS en todas, `acceso_actual()` con la regla §4.3, funciones `crear_ticket`, `elegir_cliente`, `olvidar_cliente_elegido` y `registrar_solicitud_acceso`, y bucket privado `adjuntos`.
+- `src/backend/` (interfaz `Backend` + implementaciones Supabase y demo), `src/repositorio/supabase/` y `src/integrations/supabase/` (cliente y tipos con la convención de Lovable).
+- Se eliminaron los route handlers, la sesión JWE, `proxy.ts`, `next.config.ts`, `vercel.json` y las dependencias de Next, `jose` y `server-only`.
+- Tests: 84 de Vitest (34 sobre la migración en PGlite) y 20 de Playwright contra el build de producción.
+
+**Decisiones:** ADR-011 a ADR-014.
+
+**Pendientes**
+
+- Conectar Lovable Cloud, aplicar la migración y configurar el proveedor Azure (`DEPLOY.md`).
+- Cargar `configuracion`, `personal_bhi`, clientes, áreas, tableros y `cliente_miembro` reales.
+- Etapa 1 sobre Supabase: alta de reclamo (`crear_ticket` ya existe), detalle, comentarios del cliente (falta la función), subida de adjuntos (falta la política de `storage`) y kanban de soporte.
+- Etapas 4 y 5 (correo, Teams, MCP, cron de cierre) como Edge Functions.
+- El texto del selector demo todavía dice "Nada de esto llega a SharePoint" (no se tocó para no cambiar la UI).
+
+---
+
 ## 2026-10-06 · Etapa 0 — Base
 
 **Qué se hizo**

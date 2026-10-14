@@ -1,10 +1,8 @@
 # Dependencias
 node_modules
 
-# Next.js / build
-.next
-out
-next-env.d.ts
+# Build
+dist
 *.tsbuildinfo
 
 # Tests
@@ -12,9 +10,6 @@ coverage
 playwright-report
 test-results
 blob-report
-
-# Vercel
-.vercel
 
 # Logs
 *.log

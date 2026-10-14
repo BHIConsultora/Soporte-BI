@@ -1,4 +1,4 @@
-/** El ID visible se deriva del ID de SharePoint; no se guarda. */
+/** El ID visible se deriva del ID numérico del ticket; no se guarda. */
 export function formatTicketId(itemId: number): string {
   return `TCK-${String(itemId).padStart(4, "0")}`;
 }
