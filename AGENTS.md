@@ -5,7 +5,8 @@ Guía para agentes (Claude Code y otros) que trabajen en este repo.
 ## Antes de tocar nada
 
 - Fuente de verdad del diseño: `docs/CONTEXTO-PROYECTO.md`. Decisiones: `docs/DECISIONES.md`. Historia: `docs/BITACORA.md`.
-- `RESUMEN-TECNICO.md` describe la **versión anterior** (Lovable + Supabase). Sirve como antecedente, no como diseño vigente.
+- `RESUMEN-TECNICO.md` describe una versión anterior (TanStack Start + SharePoint). Sirve como antecedente, no como diseño vigente.
+- La plataforma actual es **Vite + React Router + Supabase (Lovable Cloud)**: ver ADR-011 a ADR-014 y `docs/DEPLOY.md`.
 
 ## Reglas
 
@@ -19,9 +20,12 @@ Guía para agentes (Claude Code y otros) que trabajen en este repo.
 
 ## Arquitectura en una línea por capa
 
-- `src/app/`: Next.js App Router (pantallas y route handlers). Los handlers solo validan (zod), arman la sesión y llaman a `servicios/`.
-- `src/servicios/`: casos de uso + **autorización** (por recurso, desde la sesión validada). Devuelven DTOs distintos para cliente y soporte.
-- `src/repositorio/`: interfaces de persistencia con dos implementaciones: `sharepoint/` (Graph) y `demo/` (en memoria, solo con `DEMO_MODE=true`).
-- `src/infra/`: Graph, auth (MSAL Node + sesión cifrada), CSRF, rate limit, mailer, notifier, logger, entorno.
-- `src/dominio/`: tipos, enums, esquemas zod, SLA y helpers puros (sin I/O).
-- Ningún componente ni handler llama a Graph directamente.
+- `supabase/migrations/`: modelo de datos, RLS y funciones. **La autorización real vive acá.** Toda regla de acceso nueva se escribe en SQL y se prueba en `tests/supabase/` contra la lógica TS.
+- `src/app/`: arranque de la SPA (rutas, `SesionProvider`, error boundary). `src/paginas/`: pantallas.
+- `src/backend/`: interfaz `Backend` que usa la UI (sesión, acceso, acciones), con implementaciones `supabase.ts` y `demo.ts` (`VITE_DEMO_MODE=true`).
+- `src/servicios/`: casos de uso. `resolverAcceso` es la especificación ejecutable de `acceso_actual()`; `filtroPorRol` elige la vista dentro del techo que pone RLS. Devuelven DTOs distintos para cliente y soporte.
+- `src/repositorio/`: lecturas, con implementaciones `supabase/` y `demo/` (en memoria).
+- `src/integrations/supabase/`: cliente y tipos con la convención de Lovable (Lovable puede regenerarlos).
+- `src/dominio/`: tipos, enums y helpers puros (sin I/O). Los enums coinciden 1 a 1 con los de la migración.
+- Ningún componente llama a `supabase` directamente: siempre por `Backend`/`Repositorio`.
+- Nada de secretos en variables `VITE_*`: terminan en el navegador.

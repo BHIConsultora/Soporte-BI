@@ -2,19 +2,20 @@ import { describe, expect, it } from "vitest";
 import { assertDemoModeAllowed, isDemoFlag } from "@/infra/demo-guard";
 
 describe("guardia del modo demo", () => {
-  it("solo se activa con DEMO_MODE=true exacto", () => {
-    expect(isDemoFlag({ DEMO_MODE: "true" })).toBe(true);
-    expect(isDemoFlag({ DEMO_MODE: "1" })).toBe(false);
+  it("solo se activa con VITE_DEMO_MODE=true exacto", () => {
+    expect(isDemoFlag({ VITE_DEMO_MODE: "true" })).toBe(true);
+    expect(isDemoFlag({ VITE_DEMO_MODE: "1" })).toBe(false);
     expect(isDemoFlag({})).toBe(false);
   });
 
-  it("falla con DEMO_MODE=true en producción de Vercel", () => {
-    expect(() => assertDemoModeAllowed({ DEMO_MODE: "true", VERCEL_ENV: "production" })).toThrow(/DEMO_MODE/);
+  it("falla si el modo demo convive con Supabase configurado", () => {
+    expect(() => assertDemoModeAllowed({ VITE_DEMO_MODE: "true", VITE_SUPABASE_URL: "https://x.supabase.co" })).toThrow(
+      /VITE_DEMO_MODE/,
+    );
   });
 
-  it("permite demo en preview y desarrollo, y producción sin demo", () => {
-    expect(() => assertDemoModeAllowed({ DEMO_MODE: "true", VERCEL_ENV: "preview" })).not.toThrow();
-    expect(() => assertDemoModeAllowed({ DEMO_MODE: "true" })).not.toThrow();
-    expect(() => assertDemoModeAllowed({ VERCEL_ENV: "production" })).not.toThrow();
+  it("permite demo sin Supabase y Supabase sin demo", () => {
+    expect(() => assertDemoModeAllowed({ VITE_DEMO_MODE: "true" })).not.toThrow();
+    expect(() => assertDemoModeAllowed({ VITE_SUPABASE_URL: "https://x.supabase.co" })).not.toThrow();
   });
 });

@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { entrarComo, sinScrollHorizontal, sinViolacionesSerias } from "./helpers";
 
-test.describe("etapa 0 · base en modo demo", () => {
+test.describe("base en modo demo", () => {
   test("sin sesión redirige a bienvenida conservando la URL", async ({ page }) => {
     await page.goto("/?vista=org");
     await expect(page).toHaveURL(/\/bienvenida\?volver=%2F%3Fvista%3Dorg$/);
@@ -59,24 +59,18 @@ test.describe("etapa 0 · base en modo demo", () => {
     await expect(page).toHaveURL(/\/bienvenida$/);
   });
 
-  test("headers de seguridad y CSP con nonce", async ({ page }) => {
-    const res = await page.goto("/bienvenida");
-    const h = res!.headers();
-    expect(h["content-security-policy"]).toMatch(/script-src 'self' 'nonce-[A-Za-z0-9+/=]+' 'strict-dynamic'/);
-    expect(h["content-security-policy"]).toContain("frame-ancestors 'none'");
-    expect(h["x-content-type-options"]).toBe("nosniff");
-    expect(h["referrer-policy"]).toBe("strict-origin-when-cross-origin");
-    expect(h["strict-transport-security"]).toContain("max-age=");
-    expect(h["x-powered-by"]).toBeUndefined();
+  test("el build trae la CSP en un meta", async ({ page }) => {
+    await page.goto("/bienvenida");
+    const csp = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute("content");
+    expect(csp).toContain("default-src 'self'");
+    expect(csp).toContain("script-src 'self'");
+    expect(csp).toContain("object-src 'none'");
   });
 
-  test("el cambio de persona rechaza otro origen", async ({ request }) => {
-    const res = await request.post("/api/demo/persona", {
-      form: { persona: "admin", volver: "/" },
-      headers: { origin: "https://malo.example.com" },
-      maxRedirects: 0,
-    });
-    expect(res.status()).toBe(403);
-    expect(await res.json()).toMatchObject({ code: "sin_permiso", requestId: expect.any(String) });
+  test("el login vuelve a la página pedida", async ({ page }) => {
+    await page.goto("/?vista=org");
+    await page.getByRole("link", { name: "Iniciar sesión con Microsoft" }).click();
+    await expect(page).toHaveURL(/\/\?vista=org$/);
+    await expect(page.getByRole("heading", { name: "Mis reclamos" })).toBeVisible();
   });
 });

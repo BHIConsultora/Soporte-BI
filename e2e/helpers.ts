@@ -3,7 +3,7 @@ import { expect, type Page } from "@playwright/test";
 
 /** Entra con la persona por defecto y, si hace falta, cambia a otra desde el selector demo. */
 export async function entrarComo(page: Page, persona: string, volver = "/") {
-  await page.goto(`/api/auth/login?volver=${encodeURIComponent(volver)}`);
+  await page.goto(`/auth/login?volver=${encodeURIComponent(volver)}`);
   if (persona === "usuario") return;
   await page.getByText("Modo demo · cambiar persona").click();
   await page.getByLabel("Entrar como").selectOption(persona);

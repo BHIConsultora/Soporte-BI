@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CLIENTE, DEMO_BHI_TENANT_ID, DEMO_GRUPO_PATAGONIA } from "@/repositorio/demo/datos";
+import { CLIENTE, DEMO_BHI_TENANT_ID, DEMO_TENANT_ANDINA } from "@/repositorio/demo/datos";
 import { resolverAcceso } from "@/servicios/acceso";
 import { identidadDe, repoDemo } from "./helpers";
 
@@ -19,7 +19,7 @@ describe("resolución de acceso (§4.3)", () => {
     expect(acceso).toMatchObject({ tipo, rol });
   });
 
-  it("invitado de BHI → sin_permiso aunque tenga app role", async () => {
+  it("cuenta del tenant de BHI que no es personal ni satélite (p. ej. invitado) → sin_permiso", async () => {
     expect(await resolverAcceso(identidadDe("invitado"), repoDemo(), opciones)).toEqual({ tipo: "denegado", code: "sin_permiso" });
   });
 
@@ -30,18 +30,18 @@ describe("resolución de acceso (§4.3)", () => {
     });
   });
 
-  it("miembro de BHI sin rol ni grupo satélite → sin_permiso", async () => {
-    const id = { ...identidadDe("satelite"), grupos: [] };
+  it("miembro de BHI sin rol ni membresía satélite → sin_permiso", async () => {
+    const id = { ...identidadDe("satelite"), email: "otra.persona@bhi.example.com" };
     expect(await resolverAcceso(id, repoDemo(), opciones)).toEqual({ tipo: "denegado", code: "sin_permiso" });
   });
 
-  it("los app roles de otro tenant no dan acceso de soporte", async () => {
-    const id = { ...identidadDe("usuario"), appRoles: ["Admin", "Soporte"] };
+  it("el personal de BHI solo cuenta dentro del tenant de BHI", async () => {
+    const id = { ...identidadDe("soporte"), tid: DEMO_TENANT_ANDINA };
     expect(await resolverAcceso(id, repoDemo(), opciones)).toMatchObject({ tipo: "cliente", rol: "usuario" });
   });
 
-  it("los grupos solo cuentan dentro del tenant de BHI", async () => {
-    const id = { ...identidadDe("no-habilitado"), grupos: [DEMO_GRUPO_PATAGONIA] };
+  it("las membresías satélite solo cuentan dentro del tenant de BHI", async () => {
+    const id = { ...identidadDe("no-habilitado"), email: identidadDe("satelite").email };
     expect(await resolverAcceso(id, repoDemo(), opciones)).toMatchObject({ tipo: "denegado" });
   });
 

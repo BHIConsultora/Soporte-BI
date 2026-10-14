@@ -12,9 +12,6 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  NEXT_TELEMETRY_DISABLED: "1"
-
 jobs:
   verificar:
     name: Lint, tipos, tests, build y e2e
@@ -33,8 +30,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Auditoría de dependencias
-        # GHSA-vfj7-8cjw-p6xm: braces (solo dev, vía eslint-config-next). Ver docs/DECISIONES.md (ADR-007).
-        run: bun audit --audit-level=moderate --ignore=GHSA-vfj7-8cjw-p6xm
+        run: bun audit --audit-level=moderate
 
       - name: Lint
         run: bun run lint
@@ -42,7 +38,7 @@ jobs:
       - name: Tipos
         run: bun run typecheck
 
-      - name: Tests
+      - name: Tests (incluye la migración de Supabase sobre PGlite)
         run: bun run test
 
       - name: Build

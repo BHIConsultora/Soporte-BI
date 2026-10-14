@@ -22,8 +22,9 @@ export interface ConsultaTickets {
 }
 
 /**
- * Filtro obligatorio según el rol (§5). Toda lectura de tickets pasa por acá.
- * Para roles de cliente siempre incluye `clienteId`.
+ * Filtro según el rol (§5). Toda lectura de tickets pasa por acá.
+ * Para roles de cliente siempre incluye `clienteId`. En Supabase el techo real lo pone
+ * la política RLS de `ticket`: este filtro solo elige la vista dentro de ese techo.
  */
 export function filtroPorRol({ identidad, acceso }: ContextoAutorizado, vista: Vista = "mios"): TicketFiltro {
   if (acceso.tipo === "bhi") return {};

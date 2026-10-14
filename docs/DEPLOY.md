@@ -1,90 +1,119 @@
-# Deploy y configuración
+# Deploy y configuración (Lovable + Supabase + Entra ID)
 
-Pasos manuales para el administrador (Martín). El equipo de desarrollo no tiene credenciales de Microsoft 365 ni de Vercel: todo lo que requiere secretos o permisos de admin está acá.
+Pasos para quien levante el portal en Lovable. Arquitectura y motivos: ADR-011 a ADR-014 en `DECISIONES.md`.
 
-Estado por etapa: ✅ listo para hacer · 🕒 se completa en una etapa posterior.
-
----
-
-## 1. Vercel ✅ (etapa 0: preview en modo demo)
-
-### 1.1 Crear el proyecto
-
-1. En Vercel → **Add New… → Project** → importar `BHIConsultora/Soporte-BI` (autorizar la GitHub App de Vercel para la organización si lo pide).
-2. Framework: **Next.js** (se detecta solo). Install y build ya están en `vercel.json`:
-   - Install: `bun install --frozen-lockfile`
-   - Build: `bun run build`
-3. Root directory: la raíz del repo.
-4. **Antes del primer deploy**, en *Settings → Environment Variables*, cargar para el entorno **Preview** (no para Production):
-
-   | Variable | Valor | Entorno |
-   |---|---|---|
-   | `DEMO_MODE` | `true` | **Solo Preview** |
-   | `SESSION_SECRET` | 64 caracteres aleatorios (opcional en demo) | Preview |
-
-   > ⚠️ Nunca cargar `DEMO_MODE` en Production: el build falla a propósito si `DEMO_MODE=true` y `VERCEL_ENV=production`.
-
-### 1.2 Rama de producción (ADR-010)
-
-Hasta que esté el login real (etapa 2), producción no tiene cómo funcionar. Para que cada push a `main` genere un **Preview** en modo demo:
-
-1. *Settings → Git → Production Branch* → escribir `produccion` (la rama todavía no existe; Vercel lo acepta).
-2. Desde ese momento, cada push a `main` crea un deploy de Preview con su URL. La URL fija de la rama queda como `soporte-bi-git-main-<equipo>.vercel.app`.
-3. Opcional: *Settings → Deployment Protection* → **Vercel Authentication** activado para Preview (solo gente del equipo de Vercel ve la demo).
-
-### 1.3 Verificar el preview
-
-1. Abrir la URL del preview → debería redirigir a **/bienvenida** con el aviso "Modo demo".
-2. "Iniciar sesión con Microsoft" entra como *Ulises Usuario* (persona demo).
-3. Con el botón flotante **"Modo demo · cambiar persona"** se recorren los roles.
-
-### 1.4 Plan
-
-Hobby alcanza para pruebas. **Antes de dar acceso a clientes** pasar a **Pro** (uso comercial, Vercel Firewall para rate limit, más ejecuciones de cron).
+Resumen: **Lovable** compila y publica la SPA (Vite) · **Lovable Cloud (Supabase)** tiene la base, la autorización (RLS) y el login · **Entra ID** pone las cuentas de Microsoft (las apps ya están creadas).
 
 ---
 
-## 2. GitHub ✅
+## 1. Llevar el repo a Lovable
 
-- El CI (`.github/workflows/ci.yml`) corre en cada push a `main` y en PRs: audit, lint, tipos, tests, build y e2e.
-- Recomendado: *Settings → Branches → Branch protection* sobre `main`: requerir el check **"Lint, tipos, tests, build y e2e"**, prohibir *force push* y borrado de la rama.
-- *Settings → Actions → General*: "Workflow permissions" en **Read repository contents** (el workflow ya pide `contents: read`).
+1. Crear un proyecto en Lovable y conectarlo a GitHub (*Settings → GitHub*). Lovable sincroniza en los dos sentidos con la rama por defecto.
+2. Subir este código a ese repositorio (o, si Lovable permite importar un repo existente, importar este directamente).
+3. Lovable detecta Vite solo: `vite` en desarrollo (puerto 8080, ya configurado en `vite.config.ts`) y `vite build` para publicar. No hace falta configurar nada más del build.
 
----
+### 1.1 Probar en modo demo (opcional, sin backend)
 
-## 3. Entra ID (tenant BHI) 🕒 etapa 2
+Para ver el portal antes de conectar Supabase, cargar en *Settings → Environment* (o en `.env`) `VITE_DEMO_MODE=true`. Entra con personas ficticias y un selector flotante para cambiar de rol.
 
-Se detalla en la etapa 2. Adelanto de lo que se va a necesitar:
+> ⚠️ El build **falla a propósito** si `VITE_DEMO_MODE=true` y además existe `VITE_SUPABASE_URL`. Al conectar Lovable Cloud hay que quitar `VITE_DEMO_MODE`.
 
-1. **App "Soporte BI – Portal"** (multi-tenant, web): redirect URI `https://<dominio>/api/auth/callback`; app roles `Soporte` y `Admin`; claim `groups` → "Groups assigned to the application"; asignar el grupo de soporte y los grupos satélite.
-2. **App "Soporte BI – Datos"** (single tenant): permiso de aplicación `Sites.Selected` (admin consent) y `Mail.Send` (acotado con RBAC for Applications de Exchange al buzón `NOTIFY_MAILBOX`).
-3. **Credenciales federadas** (sin secretos) en ambas apps para el proyecto de Vercel. Los valores exactos (issuer `https://oidc.vercel.com/<equipo>`, subject `owner:<equipo>:project:<proyecto>:environment:production`, audiencia) se confirman en la etapa 2 contra la documentación vigente de Vercel.
-4. Habilitar **OIDC Federation** en el proyecto de Vercel (*Settings → Security*).
+## 2. Backend: Lovable Cloud (Supabase)
 
-## 4. SharePoint 🕒 etapa 3
+1. En Lovable, activar **Cloud** (o conectar un proyecto propio de Supabase). Lovable carga solas `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY`.
+2. Aplicar la migración **`supabase/migrations/20261014000000_modelo_inicial.sql`**: pedirle a Lovable que la ejecute, o pegarla en el editor SQL del proyecto. Crea tablas, enums, RLS, funciones y el bucket privado `adjuntos`.
+3. Si Lovable regenera `src/integrations/supabase/types.ts` o `client.ts`, el resultado tiene que ser equivalente: el cliente se exporta como `supabase` y usa las mismas dos variables.
 
-1. Crear el sitio **"Soporte BI"** en el tenant de BHI.
-2. Otorgar a la app "Soporte BI – Datos" permiso `write` **solo sobre ese sitio** (Graph `POST /sites/{siteId}/permissions`).
-3. Obtener `SP_SITE_ID` (`GET https://graph.microsoft.com/v1.0/sites/<host>:/sites/<ruta>` → `id`).
-4. Correr `scripts/provision.ts` en dry run y luego con `--apply` (workflow de GitHub con credencial federada).
+## 3. Login con Microsoft (Entra ID → Supabase Auth)
 
-## 5. Exchange y Teams 🕒 etapa 4
+Se usa la app **"Soporte BI – Portal"** del tenant de BHI (multi-tenant).
 
-- RBAC for Applications: limitar `Mail.Send` de la app Datos al buzón `NOTIFY_MAILBOX` (hoy `mlasserre@bhiconsultora.com.ar`).
-- Teams: crear el canal de soporte y un flujo de Workflows "cuando se recibe una solicitud de webhook" → `TEAMS_WEBHOOK_URL`.
+### 3.1 En Entra ID (portal de Azure → App registrations → Soporte BI – Portal)
 
-## 6. Variables de entorno (referencia)
+1. **Authentication → Add a platform → Web** con redirect URI:
+   `https://<project-ref>.supabase.co/auth/v1/callback`
+   (el `project-ref` sale de `VITE_SUPABASE_URL`).
+2. **Supported account types:** "Accounts in any organizational directory" (multi-tenant).
+3. **Certificates & secrets → New client secret.** Copiar el valor (solo se ve una vez). Va **solo** en Supabase, nunca en el repo ni en variables `VITE_*`. Anotar el vencimiento para rotarlo.
+4. **Token configuration → Add optional claim → ID → `email`** y **`xms_edov`** (Supabase lo usa para dar el email por verificado).
+5. Los app roles `Soporte`/`Admin` y el claim `groups` **ya no se usan** (ADR-012): el personal y los satélites se cargan en la base (§4).
 
-| Variable | Obligatoria | Dónde se obtiene | Etapa |
-|---|---|---|---|
-| `DEMO_MODE` | Solo Preview/desarrollo | `true` | 0 |
-| `APP_URL` | Sí (prod) | URL pública del portal | 2 |
-| `SESSION_SECRET` | Sí (prod) | 64 caracteres aleatorios | 0/2 |
-| `BHI_TENANT_ID` | Sí | Entra → Overview → Tenant ID | 2 |
-| `PORTAL_CLIENT_ID` | Sí | App Portal → Application (client) ID | 2 |
-| `DATA_CLIENT_ID` | Sí | App Datos → Application (client) ID | 3 |
-| `SP_SITE_ID` | Sí | Graph (ver §4) | 3 |
-| `NOTIFY_MAILBOX` | Sí | Buzón de envío | 4 |
-| `TEAMS_WEBHOOK_URL` | No | Workflows de Teams | 4 |
-| `CRON_SECRET` | Sí | 32+ caracteres aleatorios | 4 |
-| `ANTHROPIC_API_KEY` | No | Consola de Anthropic (activa el triage automático) | 5 |
+### 3.2 En Supabase (Authentication → Providers → Azure)
+
+| Campo | Valor |
+|---|---|
+| Enabled | sí |
+| Application (client) ID | ID de la app Portal |
+| Secret value | el client secret del paso 3.1.3 |
+| Azure Tenant URL | `https://login.microsoftonline.com/organizations` (cualquier organización, sin cuentas personales) |
+
+### 3.3 En Supabase (Authentication → URL Configuration)
+
+- **Site URL:** la URL publicada del portal (p. ej. `https://soporte.bhiconsultora.com.ar`).
+- **Redirect URLs:** `https://<dominio-publicado>/auth/callback` y la del preview de Lovable (`https://<preview>.lovable.app/auth/callback`). Para desarrollo local: `http://localhost:8080/auth/callback`.
+
+### 3.4 Consentimiento por cliente
+
+La primera vez que entra alguien de un tenant cliente, Entra puede pedir consentimiento de administrador (depende de la política del tenant y de si la app tiene publisher verification). Link de admin consent para mandarle al admin del cliente:
+`https://login.microsoftonline.com/organizations/adminconsent?client_id=<client-id-de-la-app-Portal>`
+
+## 4. Datos iniciales (editor SQL)
+
+Emails siempre en minúsculas.
+
+```sql
+-- Tenant de BHI (Entra → Overview → Tenant ID). Sin esta fila nadie de BHI tiene acceso.
+insert into public.configuracion (bhi_tenant_id) values ('<tenant-id-de-bhi>');
+
+-- Personal de BHI (reemplaza los app roles Soporte/Admin).
+insert into public.personal_bhi (email, nombre, rol) values
+  ('mlasserre@bhiconsultora.com.ar', 'Martín Lasserre', 'admin');
+
+-- Cliente con tenant propio: el tenant_id es la lista de permitidos.
+insert into public.cliente (nombre, tipo, tenant_id, dominio, referentes, notas_contexto)
+values ('<Cliente>', 'tenant', '<tenant-id-del-cliente>', '<dominio>', array['referente@cliente.com'], '<contexto para soporte>')
+returning id;
+
+-- Cliente satélite (cuentas del tenant de BHI) y sus miembros (reemplaza los grupos de Entra).
+insert into public.cliente (nombre, tipo, dominio) values ('<Satélite>', 'satelite', '<dominio>') returning id;
+insert into public.cliente_miembro (cliente_id, email) values (<id>, 'persona@bhiconsultora.com.ar');
+
+-- Áreas, tableros (slug estable = el que manda el botón de Power BI) y su relación.
+insert into public.area (cliente_id, nombre, lideres) values (<id>, 'Comercial', array['lider@cliente.com']) returning id;
+insert into public.tablero (id, cliente_id, nombre, paginas) values ('ventas-dtc', <id>, 'Ventas DTC', array['resumen']);
+insert into public.tablero_area (tablero_id, area_id, cliente_id) values ('ventas-dtc', <area_id>, <id>);
+
+-- Feriados (SLA en horas hábiles).
+insert into public.feriado (fecha, descripcion) values ('2026-12-25', 'Navidad');
+```
+
+Si alguien entra desde un tenant no habilitado, queda una fila en `solicitud_acceso` para revisar.
+
+## 5. Verificar
+
+1. Abrir la URL publicada → redirige a **/bienvenida**.
+2. "Iniciar sesión con Microsoft" → login de Microsoft → vuelve a la página pedida.
+3. Con una cuenta de BHI cargada en `personal_bhi` se ven todos los tickets; con una cuenta de un cliente, solo lo que permite su rol (§5 del contexto).
+4. Una cuenta de un tenant no cargado ve "Tu organización todavía no está habilitada" y aparece en `solicitud_acceso`.
+
+## 6. Seguridad: qué cambia respecto de la versión anterior
+
+- La autorización está en **RLS** (`supabase/migrations/`), no en un servidor propio. La clave publicable de Supabase es pública por diseño.
+- **Nunca** usar la `service_role` key en el frontend ni en variables `VITE_*`.
+- La CSP va en un `<meta>` del build (ADR-013). Lovable no permite headers: `frame-ancestors`, HSTS y `X-Frame-Options` requieren un proxy delante del dominio propio.
+- `tests/supabase/` prueba la migración contra la lógica TS; correr `bun run test` antes de cambiar cualquier política.
+
+## 7. GitHub
+
+- El CI (`.github/workflows/ci.yml`) corre en cada push a `main` y en PRs: audit, lint, tipos, tests (incluye la migración sobre PGlite), build y e2e en modo demo.
+- Recomendado: *Branch protection* sobre `main` requiriendo el check **"Lint, tipos, tests, build y e2e"**.
+
+## 8. Variables de entorno (todas públicas)
+
+| Variable | Dónde | Notas |
+|---|---|---|
+| `VITE_SUPABASE_URL` | Lovable Cloud (automática) | |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Lovable Cloud (automática) | Pública por diseño |
+| `VITE_DEMO_MODE` | Solo desarrollo/preview | `true` = datos ficticios; incompatible con `VITE_SUPABASE_URL` |
+
+Secretos (client secret de Entra; a futuro, claves de correo, Teams o Anthropic para Edge Functions) van en Supabase (*Authentication → Providers* o *Edge Functions → Secrets*), nunca en el repo.

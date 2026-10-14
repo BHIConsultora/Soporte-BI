@@ -1,4 +1,7 @@
-/** Valores de dominio compartidos por cliente, servidor, SharePoint y MCP. */
+/**
+ * Valores de dominio compartidos por la UI, la base (enums de `supabase/migrations/`) y el MCP.
+ * Si cambia un valor acá, cambia también en la migración.
+ */
 
 export const TIPOS_TICKET = [
   "Dato incorrecto",

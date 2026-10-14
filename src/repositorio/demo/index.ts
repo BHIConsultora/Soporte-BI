@@ -1,5 +1,6 @@
 import { formatTicketId } from "@/dominio/ticket-id";
 import type { Ticket } from "@/dominio/entidades";
+import type { FuenteAcceso } from "@/servicios/acceso";
 import type { OpcionesPagina, Pagina, Repositorio, TicketFiltro } from "../tipos";
 import { crearDatosDemo, type DatosDemo } from "./datos";
 
@@ -30,15 +31,20 @@ function paginar<T>(items: T[], { cursor, limite = LIMITE_POR_DEFECTO }: Opcione
 const copia = <T>(x: T): T => structuredClone(x);
 
 /** Repositorio en memoria. Devuelve copias para que nadie mute el estado por referencia. */
-export function crearDemoRepo(datos: DatosDemo = crearDatosDemo()): Repositorio {
+export function crearDemoRepo(datos: DatosDemo = crearDatosDemo()): Repositorio & FuenteAcceso {
   return {
     clientes: {
       listar: async () => copia(datos.clientes),
       obtener: async (id) => copia(datos.clientes.find((c) => c.id === id) ?? null),
       buscarPorTenant: async (tid) =>
-        copia(datos.clientes.find((c) => c.tipo === "tenant" && c.tenantId === tid) ?? null),
-      buscarPorGrupos: async (grupos) =>
-        copia(datos.clientes.filter((c) => c.tipo === "satelite" && c.grupoId !== null && grupos.includes(c.grupoId))),
+        copia(datos.clientes.find((c) => c.tipo === "tenant" && c.tenantId?.toLowerCase() === tid.toLowerCase()) ?? null),
+      listarSatelitesDe: async (email) => {
+        const ids = new Set(datos.miembros.filter((m) => m.email === email).map((m) => m.clienteId));
+        return copia(datos.clientes.filter((c) => c.tipo === "satelite" && ids.has(c.id)));
+      },
+    },
+    personalBhi: {
+      rolDe: async (email) => datos.personalBhi.find((p) => p.activo && p.email === email)?.rol ?? null,
     },
     areas: {
       listarPorCliente: async (clienteId) => copia(datos.areas.filter((a) => a.clienteId === clienteId)),

@@ -10,8 +10,9 @@ import type {
 } from "@/dominio/entidades";
 
 /**
- * Persistencia sin autorización: la capa `servicios/` decide qué filtro aplicar.
- * Implementaciones: `sharepoint/` (Graph) y `demo/` (en memoria).
+ * Lecturas de datos. Implementaciones: `supabase/` (Lovable Cloud) y `demo/` (en memoria).
+ * En Supabase cada consulta además pasa por RLS: un rol de cliente nunca recibe filas ajenas
+ * ni las columnas internas (`ticket_soporte`), aunque el filtro pida otra cosa.
  */
 
 export interface TicketFiltro {
@@ -42,8 +43,6 @@ export interface Repositorio {
   clientes: {
     listar(): Promise<Cliente[]>;
     obtener(id: number): Promise<Cliente | null>;
-    buscarPorTenant(tenantId: string): Promise<Cliente | null>;
-    buscarPorGrupos(grupoIds: readonly string[]): Promise<Cliente[]>;
   };
   areas: {
     listarPorCliente(clienteId: number): Promise<Area[]>;
